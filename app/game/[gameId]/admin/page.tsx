@@ -22,8 +22,8 @@ import {
   Check,
   Settings,
 } from "lucide-react";
-import type { Game, Question } from "@/types";
-import { initSocket, disconnectSocket } from "@/lib/socket";
+import type { Game, GameState } from "@/types";
+import { initSocket } from "@/lib/socket";
 
 export default function AdminPage() {
   const params = useParams();
@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [isFinishing, setIsFinishing] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // ---- fetch inicial
   useEffect(() => {
     const fetchGame = async () => {
       try {
@@ -53,30 +54,45 @@ export default function AdminPage() {
     if (gameId) fetchGame();
   }, [gameId]);
 
+  // ---- socket realtime
   useEffect(() => {
-    if (!game) return;
+    if (!gameId) return;
+
     const socket = initSocket();
 
-    socket.emit("join-game", { gameId, playerId: "admin", isAdmin: true });
+    // Unirse como admin
+    socket.emit("join-admin", gameId);
 
-    // Refresh game data on events
-    const refreshGame = () =>
-      fetch(`/api/games/${gameId}`)
-        .then((res) => res.json())
-        .then((data) => setGame(data.game));
-
-    socket.on("player-joined", refreshGame);
-    socket.on("answer-submitted", refreshGame);
-    socket.on("game-finished", refreshGame);
-
-    return () => {
-      socket.off("player-joined", refreshGame);
-      socket.off("answer-submitted", refreshGame);
-      socket.off("game-finished", refreshGame);
+    // --- Listeners ---
+    const handlePlayerJoined = ({ player }: { player: any }) => {
+      console.log("player-joined received:", player);
+      setGame((prev) => {
+        if (!prev) return prev;
+        if (prev.players.some((p) => p.id === player.id)) return prev;
+        return { ...prev, players: [...prev.players, player] };
+      });
     };
-  }, [game, gameId]);
 
-  useEffect(() => disconnectSocket, []);
+    const handleGameUpdated = (state: GameState) => {
+      setGame({ ...state.game });
+    };
+
+    const handleGameFinished = ({ results }: { results: any }) => {
+      setGame((prev) => (prev ? { ...prev, status: "finished" } : null));
+    };
+
+    socket.on("player-joined", handlePlayerJoined);
+    socket.on("game-updated", handleGameUpdated);
+    socket.on("game-finished", handleGameFinished);
+
+    // --- Cleanup
+    return () => {
+      socket.off("player-joined", handlePlayerJoined);
+      socket.off("game-updated", handleGameUpdated);
+      socket.off("game-finished", handleGameFinished);
+      // NO desconectamos el socket aquí, así evita el warning
+    };
+  }, [gameId]);
 
   const handleStartGame = async () => {
     setIsStarting(true);
@@ -154,7 +170,6 @@ export default function AdminPage() {
     );
   }
 
-  // Count players who submitted the current question
   const currentQuestion = game.questions[game.currentQuestionIndex];
   const playersWithAnswers = game.players.filter(
     (p) => p.answers?.[currentQuestion.id] !== undefined

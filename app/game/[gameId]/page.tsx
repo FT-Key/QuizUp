@@ -6,7 +6,7 @@ import { QuestionCard } from "@/components/QuestionCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Users, Clock } from "lucide-react";
 import { initSocket, disconnectSocket } from "@/lib/socket";
-import type { Game, Player, GameResults, Question } from "@/types";
+import type { Game, Player, GameResults, Question, GameState } from "@/types";
 
 export default function GamePage() {
   const params = useParams();
@@ -61,9 +61,16 @@ export default function GamePage() {
 
     socket.emit("join-game", { gameId, playerId: player.id, isAdmin: false });
 
-    socket.on("game-started", (data) =>
-      setGame((prev) => (prev ? { ...prev, status: "active" } : null))
-    );
+    // --- eventos que modifican el estado ---
+    socket.on("game-started", () => {
+      setGame((prev) => (prev ? { ...prev, status: "active" } : null));
+    });
+
+    socket.on("game-updated", (state: GameState) => {
+      // state.game → trae el juego completo actualizado
+      setGame(state.game);
+    });
+
     socket.on(
       "question-changed",
       (data: { question: Question; questionIndex: number }) => {
@@ -73,6 +80,7 @@ export default function GamePage() {
         setHasSubmitted(player.answers?.[data.question.id] !== undefined);
       }
     );
+
     socket.on("game-finished", (data: { results: GameResults }) => {
       setGame((prev) => (prev ? { ...prev, status: "finished" } : null));
       setResults(data.results);
@@ -80,6 +88,7 @@ export default function GamePage() {
 
     return () => {
       socket.off("game-started");
+      socket.off("game-updated");
       socket.off("question-changed");
       socket.off("game-finished");
     };
