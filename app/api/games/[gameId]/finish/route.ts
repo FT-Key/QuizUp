@@ -1,3 +1,4 @@
+// app/api/games/[gameId]/finish/route.ts
 import { NextResponse } from "next/server";
 import connectToDB from "@/lib/mongoose";
 import { Game } from "@/models/Game";
@@ -11,9 +12,11 @@ export async function POST(req: Request, { params }: Params) {
     const { gameId } = params;
 
     await connectToDB();
+
     const game = await Game.findById(gameId);
-    if (!game)
+    if (!game) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
+    }
 
     if (game.status !== "active") {
       return NextResponse.json(
@@ -22,7 +25,11 @@ export async function POST(req: Request, { params }: Params) {
       );
     }
 
+    // Marcar el juego como terminado
     game.status = "finished";
+    // Asegurarse que currentQuestionIndex esté al final
+    game.currentQuestionIndex = game.questions.length - 1;
+
     await game.save();
 
     return NextResponse.json({ success: true });

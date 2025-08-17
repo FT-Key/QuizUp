@@ -1,41 +1,42 @@
 export interface Question {
   id: string;
   text: string;
-  options: [string, string, string, string]; // Fixed to exactly 4 options
-  correctAnswer: number; // Index of correct option (0-3)
+  options: [string, string, string, string]; // exactly 4 options
+  correctAnswer: number; // index 0-3
 }
 
 export interface Game {
   id: string;
   name: string;
-  questions: Question[]; // Changed from single question to multiple questions
+  questions: Question[];
   createdAt: Date;
   creatorId: string;
   status: "waiting" | "active" | "finished";
-  currentQuestionIndex: number; // Added to track current question in active games
+  currentQuestionIndex: number;
   players: Player[];
+  currentQuestionStartTime: number; // timestamp en ms
+  questionTimeLimit: number; // ms por pregunta
 }
 
 export interface Player {
   id: string;
   name: string;
   gameId: string;
-  answers: { [questionId: string]: number }; // Changed to track answers for multiple questions
-  score: number; // Added to track player's total score
+  answers: { [questionId: string]: number };
+  score: number;
   joinedAt: Date;
 }
 
 export interface GameState {
   game: Game;
   players: Player[];
-  currentQuestion?: Question; // Added current question for active games
-  results?: GameResults; // Added results for finished games
+  currentQuestion?: Question;
+  results?: GameResults;
 }
 
 export interface CreateGameData {
   name: string;
   questions: Array<{
-    // Changed to support multiple questions
     text: string;
     options: [string, string, string, string];
     correctAnswer: number;
@@ -53,31 +54,6 @@ export interface SubmitAnswerData {
   questionId: string;
   answer: number;
 }
-
-/* export interface GameResults {
-  totalPlayers: number
-  totalQuestions: number // Added total questions count
-  leaderboard: Array<{
-    // Enhanced results with leaderboard
-    playerId: string
-    name: string
-    score: number
-    correctAnswers: number
-    percentage: number
-  }>
-  questionResults: Array<{
-    // Added per-question results
-    questionId: string
-    questionText: string
-    correctAnswer: number
-    playerAnswers: Array<{
-      playerId: string
-      name: string
-      answer: number
-      isCorrect: boolean
-    }>
-  }>
-} */
 
 export interface GameResults {
   gameId: string;
@@ -122,4 +98,8 @@ export interface SocketEvents {
   }) => void;
   "game-finished": (data: { results: GameResults }) => void;
   "game-updated": (data: GameState) => void;
+  "question-finished": (data: {
+    gameId: string;
+    questionIndex: number;
+  }) => void;
 }

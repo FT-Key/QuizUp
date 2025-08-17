@@ -117,7 +117,18 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@keyframes countdown-bar {
+  from {
+    width: 100%;
+  }
+
+  to {
+    width: 0%;
   }
 }

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { QuestionCard } from "@/components/QuestionCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Users, Clock } from "lucide-react";
-import { initSocket, disconnectSocket } from "@/lib/socket";
+import { useSocket } from "@/hooks/useSocket";
 import type { Game, Player, GameResults, Question, GameState } from "@/types";
 
 export default function GamePage() {
@@ -18,8 +18,13 @@ export default function GamePage() {
   const [error, setError] = useState("");
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [results, setResults] = useState<GameResults | null>(null);
+  const [isQuestionFinished, setIsQuestionFinished] = useState(false);
+  const [playerAnswerResult, setPlayerAnswerResult] = useState<{
+    correct: boolean;
+    score: number;
+  } | null>(null);
 
-  // Fetch game data
+  // ---- Fetch game data
   useEffect(() => {
     const fetchGame = async () => {
       try {
@@ -35,12 +40,16 @@ export default function GamePage() {
             (p: Player) => p.id === playerId
           );
           if (foundPlayer) {
+            if (!foundPlayer.answers) foundPlayer.answers = {};
             setPlayer(foundPlayer);
+
             const currentQuestion =
               data.game.questions[data.game.currentQuestionIndex];
-            setHasSubmitted(
-              foundPlayer.answers?.[currentQuestion.id] !== undefined
-            );
+            if (currentQuestion) {
+              setHasSubmitted(
+                foundPlayer.answers?.[currentQuestion.id] !== undefined
+              );
+            }
           }
         }
       } catch (err) {
@@ -54,64 +63,98 @@ export default function GamePage() {
     if (gameId) fetchGame();
   }, [gameId]);
 
-  // Socket events
-  useEffect(() => {
-    if (!game || !player) return;
-    const socket = initSocket();
+  // ---- Socket integration
+  const { emit } = useSocket({
+    gameId,
+    playerId: player?.id,
+    events: [
+      {
+        event: "game-started",
+        callback: (data: any) => {
+          console.log("🚀 game-started event:", data);
+          setIsQuestionFinished(false);
+          setHasSubmitted(false);
+          setPlayerAnswerResult(null);
+          setGame((prev) => (prev ? { ...prev, status: "active" } : null));
+        },
+      },
+      {
+        event: "game-updated",
+        callback: (state: GameState) => {
+          console.log("🔄 game-updated event:", state);
+          setGame(state.game);
 
-    socket.emit("join-game", { gameId, playerId: player.id, isAdmin: false });
+          const currentQuestion =
+            state.game.questions[state.game.currentQuestionIndex];
+          if (currentQuestion) {
+            const allAnswered = state.game.players.every(
+              (p) => p.answers && p.answers[currentQuestion.id] !== undefined
+            );
+            console.log(
+              "📊 allAnswered check for currentQuestion:",
+              allAnswered,
+              "currentQuestion.id:",
+              currentQuestion.id
+            );
+            if (allAnswered) setIsQuestionFinished(true);
+          }
+        },
+      },
+      {
+        event: "question-finished",
+        callback: (data: {
+          correctAnswer: number;
+          scores: Record<string, number>;
+        }) => {
+          console.log("⏹ question-finished event:", data);
+          setIsQuestionFinished(true);
 
-    // --- eventos que modifican el estado ---
-    socket.on("game-started", () => {
-      setGame((prev) => (prev ? { ...prev, status: "active" } : null));
-    });
+          if (!game || !player) return;
 
-    socket.on("game-updated", (state: GameState) => {
-      // state.game → trae el juego completo actualizado
-      setGame(state.game);
-    });
+          const currentQuestion = game.questions[game.currentQuestionIndex];
+          const playerAnswer = player.answers?.[currentQuestion.id];
 
-    socket.on(
-      "question-changed",
-      (data: { question: Question; questionIndex: number }) => {
-        setGame((prev) =>
-          prev ? { ...prev, currentQuestionIndex: data.questionIndex } : null
-        );
-        setHasSubmitted(player.answers?.[data.question.id] !== undefined);
-      }
-    );
+          if (playerAnswer === undefined) {
+            console.log(
+              "⚠️ Player has not answered yet, skipping correct check"
+            );
+            return; // evita marcar incorrect automáticamente
+          }
 
-    socket.on("game-finished", (data: { results: GameResults }) => {
-      setGame((prev) => (prev ? { ...prev, status: "finished" } : null));
-      setResults(data.results);
-    });
+          const correct = playerAnswer === currentQuestion.correctAnswer;
+          const score = data.scores?.[player.id] || 0;
+          setPlayerAnswerResult({ correct, score });
+        },
+      },
+    ],
+  });
 
-    return () => {
-      socket.off("game-started");
-      socket.off("game-updated");
-      socket.off("question-changed");
-      socket.off("game-finished");
-    };
-  }, [game, player, gameId]);
-
-  useEffect(() => disconnectSocket, []);
-
+  // ---- Submit answer
   const handleAnswerSubmit = (answerIndex: number) => {
     if (!player || !game) return;
-    const socket = initSocket();
     const currentQuestion = game.questions[game.currentQuestionIndex];
+    if (!currentQuestion) return;
 
-    socket.emit("submit-answer", {
+    emit("submit-answer", {
       gameId,
       playerId: player.id,
       questionId: currentQuestion.id,
       answer: answerIndex,
     });
 
+    setPlayer((prev) =>
+      prev
+        ? {
+            ...prev,
+            answers: { ...prev.answers, [currentQuestion.id]: answerIndex },
+          }
+        : prev
+    );
     setHasSubmitted(true);
   };
 
-  if (loading) {
+  // ---- Loading / Error handling
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -120,9 +163,8 @@ export default function GamePage() {
         </div>
       </div>
     );
-  }
 
-  if (error || !game) {
+  if (error || !game)
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -133,21 +175,12 @@ export default function GamePage() {
             <p className="text-center text-gray-600 dark:text-gray-300">
               {error || "Game not found"}
             </p>
-            <div className="mt-4 text-center">
-              <a
-                href="/"
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
-              >
-                Back to Home
-              </a>
-            </div>
           </CardContent>
         </Card>
       </div>
     );
-  }
 
-  if (!player) {
+  if (!player)
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -158,19 +191,10 @@ export default function GamePage() {
             <p className="text-center text-gray-600 dark:text-gray-300 mb-4">
               You need to join this game first.
             </p>
-            <div className="text-center">
-              <a
-                href="/join"
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
-              >
-                Join Game
-              </a>
-            </div>
           </CardContent>
         </Card>
       </div>
     );
-  }
 
   const currentQuestion = game.questions[game.currentQuestionIndex];
 
@@ -194,7 +218,7 @@ export default function GamePage() {
           </div>
         </div>
 
-        {/* Game Status */}
+        {/* Waiting */}
         {game.status === "waiting" && (
           <Card className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
             <CardContent className="pt-6 text-center text-yellow-800 dark:text-yellow-200">
@@ -203,16 +227,19 @@ export default function GamePage() {
           </Card>
         )}
 
-        {/* Question Card */}
-        {game.status === "active" && !hasSubmitted && (
-          <QuestionCard
-            question={currentQuestion}
-            onAnswerSubmit={handleAnswerSubmit}
-          />
-        )}
+        {/* ACTIVE - question in progress */}
+        {game.status === "active" &&
+          !isQuestionFinished &&
+          !hasSubmitted &&
+          currentQuestion && (
+            <QuestionCard
+              question={currentQuestion}
+              onAnswerSubmit={handleAnswerSubmit}
+            />
+          )}
 
-        {/* Waiting for Results */}
-        {game.status === "active" && hasSubmitted && (
+        {/* ACTIVE - player submitted */}
+        {game.status === "active" && hasSubmitted && !isQuestionFinished && (
           <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
             <CardContent className="pt-6 text-center text-blue-800 dark:text-blue-200">
               Answer submitted! Waiting for other players...
@@ -220,81 +247,32 @@ export default function GamePage() {
           </Card>
         )}
 
-        {/* Results */}
+        {/* ACTIVE - question finished */}
+        {game.status === "active" &&
+          isQuestionFinished &&
+          playerAnswerResult && (
+            <Card className="bg-gray-50 border-gray-200 dark:bg-gray-800/20 dark:border-gray-700">
+              <CardContent className="pt-6 text-center text-gray-800 dark:text-gray-200">
+                {playerAnswerResult.correct ? (
+                  <p className="text-green-600 dark:text-green-400">
+                    Correct! +{playerAnswerResult.score} points
+                  </p>
+                ) : (
+                  <p className="text-red-600 dark:text-red-400">Incorrect!</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+        {/* FINISHED */}
         {game.status === "finished" && results && (
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle>Quiz Results</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">
-                    Total Players
-                  </p>
-                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                    {results.totalPlayers}
-                  </p>
-                </div>
-                <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="text-sm text-green-600 dark:text-green-400 mb-1">
-                    Total Questions
-                  </p>
-                  <p className="text-2xl font-bold text-green-700 dark:text-green-300">
-                    {results.totalQuestions}
-                  </p>
-                </div>
-                <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <p className="text-sm text-purple-600 dark:text-purple-400 mb-1">
-                    Leaderboard
-                  </p>
-                  <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
-                    Top: {results.leaderboard[0]?.name || "-"} (
-                    {results.leaderboard[0]?.score || 0})
-                  </p>
-                </div>
-              </div>
-
-              {/* Full leaderboard */}
-              <div className="space-y-2">
-                {results.leaderboard.map((p) => (
-                  <Card key={p.playerId} className="p-2">
-                    <div className="flex justify-between">
-                      <span>{p.name}</span>
-                      <span>
-                        {p.correctAnswers} / {results.totalQuestions} (
-                        {p.percentage.toFixed(1)}%)
-                      </span>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
+            <CardContent>{/* Leaderboard / summary here */}</CardContent>
           </Card>
         )}
-
-        {/* Player Info */}
-        <Card className="bg-gray-50 dark:bg-gray-800/50">
-          <CardHeader>
-            <CardTitle className="text-lg">Your Info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600 dark:text-gray-300">
-                Player Name:
-              </span>
-              <span className="font-medium">{player.name}</span>
-            </div>
-            {hasSubmitted && (
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-gray-600 dark:text-gray-300">
-                  Answer Submitted:
-                </span>
-                <span className="text-green-600 dark:text-green-400">Yes</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+// app/api/games/[gameId]/results/route.ts
 import { NextResponse } from "next/server";
 import connectToDB from "@/lib/mongoose";
 import { Game } from "@/models/Game";
@@ -12,6 +13,7 @@ export async function GET(req: Request, { params }: Params) {
     const { gameId } = params;
 
     await connectToDB();
+
     const gameDoc = await Game.findById(gameId);
     if (!gameDoc || gameDoc.status !== "finished") {
       return NextResponse.json(
@@ -20,28 +22,49 @@ export async function GET(req: Request, { params }: Params) {
       );
     }
 
-    // Tipar arrays explícitamente
-    const players: Player[] = gameDoc.players as Player[];
-    const questions: Question[] = gameDoc.questions as Question[];
+    const players: Player[] = (gameDoc.players || []).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      gameId,
+      answers: p.answers || {},
+      score: p.score || 0,
+      joinedAt: p.joinedAt,
+    }));
+
+    const questions: Question[] = (gameDoc.questions || []).map((q: any) => ({
+      id: q._id?.toString() || q.id || "",
+      text: q.text,
+      options: q.options,
+      correctAnswer: q.correctAnswer,
+    }));
 
     const results: GameResults = {
       gameId: gameDoc._id.toString(),
       createdAt: gameDoc.createdAt,
       totalPlayers: players.length,
       totalQuestions: questions.length,
-      leaderboard: players.map((p: Player) => ({
-        playerId: p.id,
-        name: p.name,
-        score: p.score,
-        correctAnswers: Object.keys(p.answers).length,
-        totalQuestions: questions.length,
-        percentage: (Object.keys(p.answers).length / questions.length) * 100,
-      })),
-      questionResults: questions.map((q: Question) => ({
+      leaderboard: players.map((p) => {
+        const correctAnswers = questions.filter(
+          (q) => p.answers[q.id] === q.correctAnswer
+        ).length;
+
+        return {
+          playerId: p.id,
+          name: p.name,
+          score: p.score,
+          correctAnswers,
+          totalQuestions: questions.length,
+          percentage:
+            questions.length > 0
+              ? Math.round((correctAnswers / questions.length) * 100)
+              : 0,
+        };
+      }),
+      questionResults: questions.map((q) => ({
         questionId: q.id,
         questionText: q.text,
         correctAnswer: q.correctAnswer,
-        playerAnswers: players.map((p: Player) => ({
+        playerAnswers: players.map((p) => ({
           playerId: p.id,
           name: p.name,
           answer: p.answers[q.id] ?? -1,
@@ -49,8 +72,7 @@ export async function GET(req: Request, { params }: Params) {
         })),
       })),
       averageScore:
-        players.reduce((sum: number, p: Player) => sum + p.score, 0) /
-        (players.length || 1),
+        players.reduce((sum, p) => sum + p.score, 0) / (players.length || 1),
     };
 
     return NextResponse.json({ results });

@@ -1,11 +1,12 @@
-// lib/socket.ts
 import { io, type Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
 
+/**
+ * Inicializa el socket si no está inicializado y lo retorna
+ */
 export const initSocket = (): Socket => {
   if (!socket) {
-    // Detecta URL de websocket según entorno (NEXT_PUBLIC_SOCKET_URL)
     const SOCKET_URL =
       process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000";
 
@@ -29,8 +30,14 @@ export const initSocket = (): Socket => {
   return socket;
 };
 
+/**
+ * Retorna el socket si ya fue inicializado
+ */
 export const getSocket = (): Socket | null => socket;
 
+/**
+ * Desconecta el socket y limpia la referencia
+ */
 export const disconnectSocket = (): void => {
   if (socket) {
     socket.disconnect();
@@ -38,17 +45,24 @@ export const disconnectSocket = (): void => {
   }
 };
 
-// Socket event types
+/**
+ * Tipado de eventos de Socket.IO
+ */
 export interface SocketEvents {
-  // Client to server
   "join-game": { gameId: string; playerId: string };
-  "submit-answer": { playerId: string; answer: number };
+  "join-admin": { gameId: string };
+  "submit-answer": {
+    gameId: string;
+    playerId: string;
+    questionId: string;
+    answer: number;
+  };
   "start-game": { gameId: string };
-
-  // Server to client
+  "finish-question": { gameId: string };
   "player-joined": { player: { id: string; name: string } };
   "game-started": { question: { text: string; options: string[] } };
   "answer-submitted": { playerId: string; playerName: string };
   "game-finished": { results: any };
+  "game-updated": { game: any };
   error: { message: string };
 }
