@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Play, Square, SkipForward, PauseCircle, Loader2 } from "lucide-react";
 
 interface Props {
-  gameStatus: string;
+  gameStatus: "waiting" | "active" | "finished";
   currentQuestionIndex: number;
   totalQuestions: number;
   isStarting: boolean;

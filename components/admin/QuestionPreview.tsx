@@ -1,5 +1,6 @@
 "use client";
 
+import { Question } from "@/types";
 import {
   Card,
   CardContent,
@@ -10,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 interface Props {
-  question: any;
+  question: Question;
   showAnswer: boolean;
   playersWithAnswers?: number;
   totalPlayers?: number;

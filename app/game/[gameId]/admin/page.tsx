@@ -12,14 +12,14 @@ import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 
 export default function AdminPage() {
   const { gameId } = useParams();
-  const { game, setGame, emit } = useAdminSocket(gameId as string);
+  const { game, setGame, emit, loading } = useAdminSocket(gameId as string);
 
   const [isStarting, setIsStarting] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
   const { timeLeft, isFinished } = useQuestionTimer(
-    game?.currentQuestionStartTime || Date.now(),
-    game?.questionTimeLimit || 30000
+    game?.currentQuestionStartTime ?? 0,
+    game?.questionTimeLimit ?? 30000
   );
 
   const questionEnded = game?.status !== "active" || isFinished;
@@ -85,7 +85,13 @@ export default function AdminPage() {
     );
   };
 
-  if (!game) return <p>Loading...</p>;
+  if (loading || !game) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading admin view...</p>
+      </div>
+    );
+  }
 
   const playersWithAnswers = currentQuestion
     ? game.players.filter((p) => p.answers?.[currentQuestion.id] !== undefined)

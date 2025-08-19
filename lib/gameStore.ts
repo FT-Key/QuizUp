@@ -2,7 +2,6 @@ import type { Game, Player, CreateGameData, Question } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { DEFAULT_TIME_LIMIT_MS } from "@/constants/game";
 
-// In-memory storage
 class GameStore {
   private games: Map<string, Game> = new Map();
   private players: Map<string, Player> = new Map();
@@ -61,36 +60,43 @@ class GameStore {
     return player;
   }
 
-  submitAnswer(playerId: string, questionId: string, answer: number) {
+  submitAnswer(
+    playerId: string,
+    questionId: string,
+    answer: number
+  ): { finishedQuestion: boolean } | false {
     const player = this.players.get(playerId);
     if (!player) return false;
 
     const game = this.games.get(player.gameId);
     if (!game) return false;
 
+    const question = game.questions.find((q) => q.id === questionId);
+    if (!question) return false;
+
+    // Guardar respuesta
     player.answers[questionId] = answer;
 
-    const question = game.questions.find((q) => q.id === questionId);
-
-    // Bonus por tiempo
-    const now = Date.now();
-    const elapsed = now - game.currentQuestionStartTime;
-    const remainingMs = Math.max(game.questionTimeLimit - elapsed, 0);
-    const remainingSeconds = Math.floor(remainingMs / 1000);
-
-    if (question && answer === question.correctAnswer) {
-      player.score += 1 + remainingSeconds;
+    // Calcular score con bonus por tiempo (centésimas)
+    if (answer === question.correctAnswer) {
+      player.score += 1;
+      const elapsed = Date.now() - game.currentQuestionStartTime;
+      const remainingMs = game.questionTimeLimit - elapsed;
+      if (remainingMs > 0) {
+        player.score += Math.floor(remainingMs / 10);
+      }
     }
 
-    // Si todos respondieron, terminar pregunta
+    // Verificar si todos respondieron
     const allAnswered = game.players.every(
-      (p) => p.answers?.[questionId] !== undefined
+      (p) => p.answers[questionId] !== undefined
     );
     if (allAnswered) {
-      return this.finishQuestion(game.id);
+      this.finishQuestion(game.id);
+      return { finishedQuestion: true };
     }
 
-    return true;
+    return { finishedQuestion: false };
   }
 
   startGame(gameId: string): boolean {
@@ -100,6 +106,7 @@ class GameStore {
     game.status = "active";
     game.currentQuestionIndex = 0;
     game.currentQuestionStartTime = Date.now();
+
     return true;
   }
 
@@ -117,28 +124,13 @@ class GameStore {
     }
   }
 
-  finishQuestion(gameId: string) {
+  // SOLO limpiar el inicio de la pregunta (no volver a sumar score)
+  finishQuestion(gameId: string): boolean {
     const game = this.games.get(gameId);
-    if (!game) return null;
+    if (!game) return false;
 
-    const now = Date.now();
-    const elapsed = now - game.currentQuestionStartTime;
-    const question = game.questions[game.currentQuestionIndex];
-
-    const scores: Record<string, number> = {};
-
-    game.players.forEach((p) => {
-      const answer = p.answers[question.id];
-      let score = 0;
-      if (answer === question.correctAnswer) {
-        const remainingMs = Math.max(game.questionTimeLimit - elapsed, 0);
-        score = 1 + Math.floor(remainingMs / 1000);
-      }
-      scores[p.id] = score;
-      p.score += score;
-    });
-
-    return { scores };
+    game.currentQuestionStartTime = 0;
+    return true;
   }
 
   finishGame(gameId: string): boolean {
@@ -164,6 +156,7 @@ class GameStore {
         name: p.name,
         score: p.score,
         correctAnswers,
+        totalQuestions: game.questions.length,
         percentage:
           game.questions.length > 0
             ? (correctAnswers / game.questions.length) * 100
@@ -172,6 +165,8 @@ class GameStore {
     });
 
     return {
+      gameId: game.id,
+      createdAt: game.createdAt,
       totalPlayers: game.players.length,
       totalQuestions: game.questions.length,
       leaderboard,

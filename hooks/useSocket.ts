@@ -11,19 +11,21 @@ export interface SocketEvent {
 
 interface UseSocketOptions {
   gameId: string;
-  playerId?: string; // opcional para admin
+  playerName?: string; // nombre del jugador (para join-game)
+  isAdmin?: boolean; // indica si es admin
   events?: SocketEvent[];
 }
 
 export const useSocket = ({
   gameId,
-  playerId,
+  playerName,
+  isAdmin = false,
   events = [],
 }: UseSocketOptions) => {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
-  // ⚡ Inicializar socket solo una vez
+  // inicializar solo 1 vez
   if (!socketRef.current) {
     socketRef.current = initSocket();
   }
@@ -31,7 +33,6 @@ export const useSocket = ({
   const socket = socketRef.current;
 
   useEffect(() => {
-    // Manejo de conexión
     const handleConnect = () => setConnected(true);
     const handleDisconnect = () => setConnected(false);
 
@@ -41,30 +42,32 @@ export const useSocket = ({
     return () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
-      console.log("Socket core listeners cleaned up, socket stays connected");
+      console.log("Socket core listeners cleaned up");
     };
   }, []);
 
   useEffect(() => {
-    // ⚡ Emit join-game SOLO cuando playerId esté definido, sin depender de cambios constantes
-    if (playerId) {
-      socket.emit("join-game", { gameId, playerId });
-      console.log("Joining game as player:", { gameId, playerId });
+    // join segun rol
+    if (isAdmin) {
+      socket.emit("join-admin", gameId);
+      console.log("Joining game as ADMIN:", { gameId });
+    } else if (playerName) {
+      socket.emit("join-game", { gameId, playerName });
+      console.log("Joining game as PLAYER:", { gameId, playerName });
     }
-  }, [gameId, playerId]);
+    // solo depende de gameId / isAdmin / playerName
+  }, [gameId, isAdmin, playerName]);
 
   useEffect(() => {
-    // Registrar listeners personalizados solo una vez
+    // registrar listeners personalizados
     events.forEach(({ event, callback }) => socket.on(event, callback));
-
     return () => {
       events.forEach(({ event, callback }) => socket.off(event, callback));
       console.log("Socket event listeners cleaned up");
     };
-    // No poner player/game como dependencia, sino solo los events
   }, [events]);
 
-  const emit = (event: string, data: any) => {
+  const emit = (event: string, data?: any) => {
     socket.emit(event, data);
   };
 

@@ -2,71 +2,72 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSocket } from "./useSocket";
-import type { Game, GameState, Player } from "@/types";
+import type { Game, Player, Question } from "@/types";
 
 export const useAdminSocket = (gameId: string) => {
   const [game, setGame] = useState<Game | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // ---- Fetch inicial del juego ----
-  useEffect(() => {
-    if (!gameId) return;
-
-    const fetchGame = async () => {
-      try {
-        const res = await fetch(`/api/games/${gameId}`);
-        if (!res.ok) throw new Error("Game not found");
-        const data = await res.json();
-        setGame(data.game);
-        console.log("Game response: ", data.game);
-      } catch (err) {
-        console.error("Failed to fetch game:", err);
-      }
-    };
-
-    fetchGame();
-  }, [gameId]);
-
-  // ---- Memoizar eventos ----
-  const events = useMemo(
-    () => [
-      {
-        event: "player-joined",
-        callback: ({ player }: { player: Player }) => {
-          setGame((prev) => {
-            if (!prev) return prev;
-            if (prev.players.some((p) => p.id === player.id)) return prev;
-            return { ...prev, players: [...prev.players, player] };
-          });
-        },
-      },
-      {
-        event: "game-updated",
-        callback: ({ game: updatedGame }: GameState) => {
-          setGame(updatedGame);
-        },
-      },
-      {
-        event: "game-finished",
-        callback: () => {
-          setGame((prev) => (prev ? { ...prev, status: "finished" } : null));
-        },
-      },
-    ],
-    []
-  );
-
-  // ---- Integrar socket ----
   const { socket, emit } = useSocket({
     gameId,
-    events,
+    isAdmin: true,
+    events: useMemo(
+      () => [
+        {
+          event: "player-joined",
+          callback: ({ player }: { player: Player }) => {
+            setGame((prev) =>
+              prev && !prev.players.some((p) => p.id === player.id)
+                ? { ...prev, players: [...prev.players, player] }
+                : prev
+            );
+          },
+        },
+        {
+          event: "game-updated",
+          callback: ({ game: updatedGame }: { game: Game }) => {
+            setGame(updatedGame);
+          },
+        },
+        {
+          event: "game-finished",
+          callback: () => {
+            setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
+          },
+        },
+        {
+          event: "game-state",
+          callback: (data: {
+            game: Game; // Game completo desde el servidor
+            currentQuestion: Question | null;
+            currentQuestionIndex: number;
+            timeLeft: number;
+          }) => {
+            setGame((prev) => {
+              const baseGame = prev || data.game;
+              return {
+                ...baseGame,
+                currentQuestionIndex: data.currentQuestionIndex,
+                currentQuestionStartTime:
+                  Date.now() - (data.game.questionTimeLimit - data.timeLeft),
+                players: data.game.players,
+                status: data.game.status,
+              };
+            });
+
+            setLoading(false);
+          },
+        },
+      ],
+      []
+    ),
   });
 
-  // ---- Emitir join-admin al conectarse ----
+  // Solicitud inicial de estado del juego
   useEffect(() => {
-    if (!socket) return;
-    socket.emit("join-admin", gameId);
-    console.log("Admin joined game:", gameId);
+    if (!socket || !gameId) return;
+    socket.emit("request-game-state", { gameId });
   }, [socket, gameId]);
 
-  return { game, setGame, emit };
+  return { game, setGame, emit, loading };
 };

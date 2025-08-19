@@ -83,23 +83,45 @@ export interface GameResults {
 }
 
 export interface SocketEvents {
-  "join-game": (data: { gameId: string; playerName: string }) => void;
+  // incoming (desde el front al server)
+  "join-game": (data: JoinGameData) => void;
   "join-admin": (gameId: string) => void;
+  "start-game": (data: { gameId: string }) => void;
+  "next-question": (data: { gameId: string }) => void;
+  "finish-question": (data: { gameId: string }) => void;
+  "finish-game": (data: { gameId: string }) => void;
+  "submit-answer": (data: SubmitAnswerData) => void;
+  "request-dashboard": () => void;
+  "request-game-state": (data: { gameId: string }) => void;
+
+  // emitted by server
   "player-joined": (data: { player: Player }) => void;
-  "game-started": (data: GameState) => void;
-  "question-changed": (data: {
+  "game-updated": (data: { game: Game }) => void;
+  "game-started": (data: {
+    game: Game;
+    players: Player[];
+    currentQuestion: Question;
+    results?: any;
+    timeLeft: number;
+  }) => void;
+  "question-updated": (data: {
     question: Question;
     questionIndex: number;
+    timeLeft: number;
   }) => void;
+  "question-finished": (data: { currentQuestionIndex: number }) => void;
   "answer-submitted": (data: {
     playerId: string;
     questionId: string;
     answer: number;
   }) => void;
-  "game-finished": (data: { results: GameResults }) => void;
-  "game-updated": (data: GameState) => void;
-  "question-finished": (data: {
-    gameId: string;
-    questionIndex: number;
+  "game-finished": (data: { results: any }) => void;
+
+  // nuevo evento que emite el servidor con el estado actual
+  "game-state": (data: {
+    game: Game;
+    currentQuestion: Question | null;
+    currentQuestionIndex: number;
+    timeLeft: number;
   }) => void;
 }

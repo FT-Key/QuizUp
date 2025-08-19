@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Game, Player, Question } from "@/types";
 import {
   Card,
   CardContent,
@@ -13,7 +14,7 @@ import { Clipboard, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
-  game: any;
+  game: Game;
   timeLeft: number;
   questionEnded: boolean;
 }
@@ -21,10 +22,13 @@ interface Props {
 export const GameInfo = ({ game, timeLeft, questionEnded }: Props) => {
   const [copied, setCopied] = useState(false);
 
-  const currentQuestion = game.questions[game.currentQuestionIndex];
-  const playersWithAnswers = game.players.filter(
-    (p: any) => p.answers?.[currentQuestion?.id] !== undefined
-  ).length;
+  const currentQuestion: Question | undefined =
+    game.questions[game.currentQuestionIndex];
+  const playersWithAnswers = currentQuestion
+    ? game.players.filter(
+        (p: Player) => p.answers?.[currentQuestion.id] !== undefined
+      ).length
+    : 0;
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(game.id);

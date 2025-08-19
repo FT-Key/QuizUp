@@ -66,35 +66,30 @@ export default function GamePage() {
   // ---- Socket integration
   const { emit } = useSocket({
     gameId,
-    playerId: player?.id,
     events: [
       {
         event: "game-started",
-        callback: (data: any) => {
-          console.log("🚀 game-started event:", data);
+        callback: (data: {
+          game: Game;
+          players: Player[];
+          currentQuestion: Question;
+        }) => {
           setIsQuestionFinished(false);
           setHasSubmitted(false);
           setPlayerAnswerResult(null);
-          setGame((prev) => (prev ? { ...prev, status: "active" } : null));
+          setGame(data.game);
         },
       },
       {
         event: "game-updated",
-        callback: (state: GameState) => {
-          console.log("🔄 game-updated event:", state);
-          setGame(state.game);
+        callback: (data: { game: Game }) => {
+          setGame(data.game);
 
           const currentQuestion =
-            state.game.questions[state.game.currentQuestionIndex];
+            data.game.questions[data.game.currentQuestionIndex];
           if (currentQuestion) {
-            const allAnswered = state.game.players.every(
-              (p) => p.answers && p.answers[currentQuestion.id] !== undefined
-            );
-            console.log(
-              "📊 allAnswered check for currentQuestion:",
-              allAnswered,
-              "currentQuestion.id:",
-              currentQuestion.id
+            const allAnswered = data.game.players.every(
+              (p) => p.answers?.[currentQuestion.id] !== undefined
             );
             if (allAnswered) setIsQuestionFinished(true);
           }
@@ -102,11 +97,7 @@ export default function GamePage() {
       },
       {
         event: "question-finished",
-        callback: (data: {
-          correctAnswer: number;
-          scores: Record<string, number>;
-        }) => {
-          console.log("⏹ question-finished event:", data);
+        callback: (data: { scores: Record<string, number> }) => {
           setIsQuestionFinished(true);
 
           if (!game || !player) return;
@@ -114,12 +105,7 @@ export default function GamePage() {
           const currentQuestion = game.questions[game.currentQuestionIndex];
           const playerAnswer = player.answers?.[currentQuestion.id];
 
-          if (playerAnswer === undefined) {
-            console.log(
-              "⚠️ Player has not answered yet, skipping correct check"
-            );
-            return; // evita marcar incorrect automáticamente
-          }
+          if (playerAnswer === undefined) return;
 
           const correct = playerAnswer === currentQuestion.correctAnswer;
           const score = data.scores?.[player.id] || 0;
