@@ -11,8 +11,8 @@ export interface SocketEvent {
 
 interface UseSocketOptions {
   gameId: string;
-  playerName?: string; // nombre del jugador (para join-game)
-  isAdmin?: boolean; // indica si es admin
+  playerName?: string;
+  isAdmin?: boolean;
   events?: SocketEvent[];
 }
 
@@ -25,7 +25,6 @@ export const useSocket = ({
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
-  // inicializar solo 1 vez
   if (!socketRef.current) {
     socketRef.current = initSocket();
   }
@@ -47,16 +46,17 @@ export const useSocket = ({
   }, []);
 
   useEffect(() => {
-    // join segun rol
+    // Solo emitimos join cuando el socket realmente está conectado
+    if (!socket.connected) return;
+
     if (isAdmin) {
-      socket.emit("join-admin", gameId);
       console.log("Joining game as ADMIN:", { gameId });
+      socket.emit("join-admin", gameId);
     } else if (playerName) {
-      socket.emit("join-game", { gameId, playerName });
       console.log("Joining game as PLAYER:", { gameId, playerName });
+      socket.emit("join-game", { gameId, playerName });
     }
-    // solo depende de gameId / isAdmin / playerName
-  }, [gameId, isAdmin, playerName]);
+  }, [socket.connected, gameId, isAdmin, playerName]);
 
   useEffect(() => {
     // registrar listeners personalizados
