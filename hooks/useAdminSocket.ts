@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "./useSocket";
 import type { Game, Player, Question } from "@/types";
 
 export const useAdminSocket = (gameId: string) => {
   const [game, setGame] = useState<Game | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const hasRequestedState = useRef(false);
 
   const { socket, emit, connected } = useSocket({
     gameId,
@@ -23,21 +25,17 @@ export const useAdminSocket = (gameId: string) => {
             game: Game;
           }) => {
             console.log("[useAdminSocket] player-joined ->", player);
-            setGame((prev) => {
-              if (!prev) return updatedGame;
-              // Evitar duplicados
-              const exists = prev.players.some((p) => p.id === player.id);
-              return exists
-                ? { ...prev, ...updatedGame } // actualizar info completa
-                : { ...prev, players: [...prev.players, player] };
-            });
+
+            // 🔹 Solo log y toast opcional
+            // Si querés, podés agregar un toast aquí:
+            // toast(`${player.name} se unió al juego!`);
           },
         },
         {
           event: "game-updated",
           callback: ({ game: updatedGame }: { game: Game }) => {
             console.log("[useAdminSocket] game-updated", updatedGame);
-            setGame(updatedGame);
+            setGame(updatedGame); // 🔹 Siempre reemplaza el game completo
           },
         },
         {
@@ -56,14 +54,16 @@ export const useAdminSocket = (gameId: string) => {
             timeLeft: number;
           }) => {
             console.log("[useAdminSocket] game-state received:", data);
+
+            const { game: incomingGame, currentQuestionIndex, timeLeft } = data;
+
             setGame({
-              ...data.game,
-              currentQuestionIndex: data.currentQuestionIndex,
+              ...incomingGame,
+              currentQuestionIndex,
               currentQuestionStartTime:
-                Date.now() - (data.game.questionTimeLimit - data.timeLeft),
-              players: data.game.players,
-              status: data.game.status,
+                Date.now() - (incomingGame.questionTimeLimit - timeLeft),
             });
+
             setLoading(false);
           },
         },
@@ -72,14 +72,12 @@ export const useAdminSocket = (gameId: string) => {
     ),
   });
 
-  // Solicitar estado actual del juego al conectar
   useEffect(() => {
-    if (!socket || !gameId) return;
-    console.log("[useAdminSocket] emitting request-game-state", {
-      connected,
-      gameId,
-    });
+    if (!socket || !gameId || !connected || hasRequestedState.current) return;
+
+    console.log("[useAdminSocket] emitting request-game-state", { gameId });
     socket.emit("request-game-state", { gameId });
+    hasRequestedState.current = true;
   }, [socket, gameId, connected]);
 
   return { game, setGame, emit, loading };
