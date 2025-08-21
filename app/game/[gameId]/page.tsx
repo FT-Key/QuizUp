@@ -8,12 +8,11 @@ import { Loader2, Users, Clock } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import type { Game, Player, GameResults, Question } from "@/types";
 
-/**
- * GamePage (player)
- */
 export default function GamePage() {
   const params = useParams();
-  const gameId = params.gameId as string;
+  const rawGameId = params.gameId;
+  if (!rawGameId || Array.isArray(rawGameId)) throw new Error("Invalid gameId");
+  const gameId = rawGameId;
 
   const [game, setGame] = useState<Game | null>(null);
   const [player, setPlayer] = useState<Player | null>(null);
@@ -27,10 +26,11 @@ export default function GamePage() {
     score: number;
   } | null>(null);
 
-  // keep prevQuestionIndex to detect transitions if needed
   const prevQuestionIndexRef = useRef<number | null>(null);
 
-  // ---- Fetch initial game data once
+  const { emit, on, off, connected } = useSocket();
+
+  // ---- Fetch initial game data ----
   useEffect(() => {
     const fetchGame = async () => {
       try {
@@ -48,7 +48,6 @@ export default function GamePage() {
           if (foundPlayer) {
             if (!foundPlayer.answers) foundPlayer.answers = {};
             setPlayer(foundPlayer);
-            emit("join-game", { gameId, playerId });
 
             const currentQuestion =
               data.game.questions[data.game.currentQuestionIndex];
@@ -67,183 +66,137 @@ export default function GamePage() {
       }
     };
 
-    if (gameId) fetchGame();
+    fetchGame();
   }, [gameId]);
 
-  // ---- Socket integration (single call)
-  const { socket, emit } = useSocket({
-    gameId,
-    events: [
-      {
-        // server replies to the joining socket with this event
-        event: "joined",
-        callback: (data: { player: Player; game: Game }) => {
-          console.log("[GamePage] joined received:", data);
-          if (data.player) {
-            localStorage.setItem("playerId", data.player.id);
-            localStorage.setItem("playerName", data.player.name);
-            setPlayer(data.player);
-          }
-          if (data.game) {
-            setGame(data.game);
-            // determine submission state for the current question
-            const curQ = data.game.questions[data.game.currentQuestionIndex];
-            if (data.player && curQ) {
-              setHasSubmitted(
-                Boolean(
-                  data.player.answers &&
-                    data.player.answers[curQ.id] !== undefined
-                )
-              );
-            }
-          }
-          setLoading(false);
-        },
-      },
-      {
-        event: "game-started",
-        callback: (data: {
-          game: Game;
-          players: Player[];
-          currentQuestion: Question;
-        }) => {
-          console.log("[GamePage] game-started:", data);
-          setIsQuestionFinished(false);
-          setHasSubmitted(false);
-          setPlayerAnswerResult(null);
-          setGame(data.game);
-          // if we already have a playerId, make sure to update the local player
-          const pid = localStorage.getItem("playerId");
-          if (pid) {
-            const found = data.game.players.find((p) => p.id === pid);
-            if (found) setPlayer(found);
-          }
-        },
-      },
-      {
-        event: "game-updated",
-        callback: (payload: { game: Game }) => {
-          console.log("[GamePage] game-updated:", payload.game);
-          const updatedGame = payload.game;
-          // update game
-          setGame(updatedGame);
+  // ---- Socket listeners ----
+  useEffect(() => {
+    if (!connected) return;
 
-          // update local player object (if we have a player id)
-          const pid = localStorage.getItem("playerId");
-          if (pid) {
-            const found = updatedGame.players.find((p) => p.id === pid);
-            if (found) {
-              setPlayer(found);
-              // check submission status for current question
-              const curQ =
-                updatedGame.questions[updatedGame.currentQuestionIndex];
-              if (curQ) {
-                setHasSubmitted(
-                  Boolean(found.answers && found.answers[curQ.id] !== undefined)
-                );
-              }
-            }
-          }
+    const handleJoined = (data: { player: Player; game: Game }) => {
+      localStorage.setItem("playerId", data.player.id);
+      localStorage.setItem("playerName", data.player.name);
+      setPlayer(data.player);
+      setGame(data.game);
 
-          // detect if question finished: if all players answered the current question
+      const curQ = data.game.questions[data.game.currentQuestionIndex];
+      if (curQ) setHasSubmitted(Boolean(data.player.answers?.[curQ.id]));
+      setLoading(false);
+    };
+
+    const handleGameStarted = (data: { game: Game }) => {
+      setIsQuestionFinished(false);
+      setHasSubmitted(false);
+      setPlayerAnswerResult(null);
+      setGame(data.game);
+
+      const pid = localStorage.getItem("playerId");
+      if (pid) {
+        const me = data.game.players.find((p) => p.id === pid);
+        if (me) setPlayer(me);
+      }
+    };
+
+    const handleGameUpdated = (payload: { game: Game }) => {
+      const updatedGame = payload.game;
+      setGame(updatedGame);
+
+      const pid = localStorage.getItem("playerId");
+      let me: Player | undefined;
+      if (pid) {
+        me = updatedGame.players.find((p) => p.id === pid);
+        if (me) {
+          setPlayer(me);
           const curQ = updatedGame.questions[updatedGame.currentQuestionIndex];
+          if (curQ) setHasSubmitted(Boolean(me.answers?.[curQ.id]));
+        }
+      }
+
+      const curQ = updatedGame.questions[updatedGame.currentQuestionIndex];
+      if (curQ) {
+        const allAnswered = updatedGame.players.every(
+          (p) => p.answers?.[curQ.id] !== undefined
+        );
+        setIsQuestionFinished(allAnswered);
+        if (allAnswered && me) {
+          const playerAns = me.answers?.[curQ.id];
+          if (playerAns !== undefined) {
+            setPlayerAnswerResult({
+              correct: playerAns === curQ.correctAnswer,
+              score: me.score || 0,
+            });
+          }
+        }
+      }
+
+      prevQuestionIndexRef.current = updatedGame.currentQuestionIndex;
+    };
+
+    const handleQuestionFinished = () => {
+      setIsQuestionFinished(true);
+      emit("request-game-state", { gameId });
+    };
+
+    const handleGameState = (payload: {
+      game: Game;
+      currentQuestion: Question | null;
+      currentQuestionIndex: number;
+    }) => {
+      setGame(payload.game);
+
+      const pid = localStorage.getItem("playerId");
+      if (pid) {
+        const me = payload.game.players.find((p) => p.id === pid);
+        if (me) {
+          setPlayer(me);
+          const curQ = payload.game.questions[payload.currentQuestionIndex];
           if (curQ) {
-            const allAnswered = updatedGame.players.every(
-              (p) => p.answers?.[curQ.id] !== undefined
-            );
-            setIsQuestionFinished(allAnswered);
-            // if finished and we have player, compute player's result (if available)
-            if (allAnswered) {
-              const pid2 = localStorage.getItem("playerId");
-              if (pid2) {
-                const me = updatedGame.players.find((p) => p.id === pid2);
-                if (me) {
-                  const playerAns = me.answers?.[curQ.id];
-                  if (playerAns !== undefined) {
-                    setPlayerAnswerResult({
-                      correct: playerAns === curQ.correctAnswer,
-                      score: me.score || 0,
-                    });
-                  }
-                }
-              }
+            setHasSubmitted(Boolean(me.answers?.[curQ.id] !== undefined));
+            if (me.answers?.[curQ.id] !== undefined) {
+              setPlayerAnswerResult({
+                correct: me.answers[curQ.id] === curQ.correctAnswer,
+                score: me.score || 0,
+              });
             }
           }
+        }
+      }
+    };
 
-          // update prevQuestionIndex
-          prevQuestionIndexRef.current = updatedGame.currentQuestionIndex;
-        },
-      },
-      {
-        event: "question-finished",
-        callback: (data: any) => {
-          console.log("[GamePage] question-finished event:", data);
-          // mark question as finished locally, then request full game-state to be safe
-          setIsQuestionFinished(true);
-          // request the authoritative game-state from the server for latest scores/players
-          emit("request-game-state", { gameId });
-        },
-      },
-      {
-        // handler for game-state responses (from request-game-state)
-        event: "game-state",
-        callback: (payload: {
-          game: Game;
-          currentQuestion: Question | null;
-          currentQuestionIndex: number;
-          timeLeft: number;
-        }) => {
-          console.log("[GamePage] game-state received:", payload);
-          setGame(payload.game);
-          const pid = localStorage.getItem("playerId");
-          if (pid) {
-            const found = payload.game.players.find((p) => p.id === pid);
-            if (found) {
-              setPlayer(found);
-              const curQ = payload.game.questions[payload.currentQuestionIndex];
-              if (curQ) {
-                setHasSubmitted(
-                  Boolean(found.answers && found.answers[curQ.id] !== undefined)
-                );
-                // if question just finished, compute result for display
-                if (found.answers?.[curQ.id] !== undefined) {
-                  setPlayerAnswerResult({
-                    correct: found.answers[curQ.id] === curQ.correctAnswer,
-                    score: found.score || 0,
-                  });
-                }
-              }
-            }
-          }
-        },
-      },
-      {
-        // generic error when join fails
-        event: "join-error",
-        callback: (payload: any) => {
-          console.error("[GamePage] join-error:", payload);
-          alert(payload?.message || "Failed to join the game");
-        },
-      },
-    ],
-  });
+    const handleJoinError = (payload: any) => {
+      console.error("[GamePage] join-error:", payload);
+      alert(payload?.message || "Failed to join the game");
+    };
 
-  // ---- Join form component (renders when !player)
-  function JoinForm() {
-    const [name, setName] = useState<string>(() => {
-      return localStorage.getItem("playerName") || "";
-    });
+    // Suscribimos eventos
+    on("joined", handleJoined);
+    on("game-started", handleGameStarted);
+    on("game-updated", handleGameUpdated);
+    on("question-finished", handleQuestionFinished);
+    on("game-state", handleGameState);
+    on("join-error", handleJoinError);
+
+    return () => {
+      off("joined", handleJoined);
+      off("game-started", handleGameStarted);
+      off("game-updated", handleGameUpdated);
+      off("question-finished", handleQuestionFinished);
+      off("game-state", handleGameState);
+      off("join-error", handleJoinError);
+    };
+  }, [connected, emit, on, off, gameId]);
+
+  // ---- Join Form ----
+  const JoinForm = () => {
+    const [name, setName] = useState<string>(
+      localStorage.getItem("playerName") || ""
+    );
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       const trimmed = name.trim();
-      if (!trimmed || !emit) return;
-      console.log("[JoinForm] emitting join-game:", {
-        gameId,
-        playerName: trimmed,
-      });
+      if (!trimmed) return;
       emit("join-game", { gameId, playerName: trimmed });
-      // server will reply with 'joined' which updates state and localStorage
     };
 
     return (
@@ -263,20 +216,12 @@ export default function GamePage() {
         </button>
       </form>
     );
-  }
+  };
 
-  // ---- Submit answer
   const handleAnswerSubmit = (answerIndex: number) => {
     if (!player || !game) return;
     const currentQuestion = game.questions[game.currentQuestionIndex];
     if (!currentQuestion) return;
-
-    console.log("[GamePage] submit-answer emit:", {
-      gameId,
-      playerId: player.id,
-      questionId: currentQuestion.id,
-      answer: answerIndex,
-    });
 
     emit("submit-answer", {
       gameId,
@@ -285,7 +230,6 @@ export default function GamePage() {
       answer: answerIndex,
     });
 
-    // optimistic update local player answers so UI responds instantly
     setPlayer((prev) =>
       prev
         ? {
@@ -297,7 +241,7 @@ export default function GamePage() {
     setHasSubmitted(true);
   };
 
-  // ---- Loading / Error handling
+  // ---- Loading / Error UI ----
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -324,8 +268,7 @@ export default function GamePage() {
       </div>
     );
 
-  // If player is not set yet, show join form
-  if (!player) {
+  if (!player)
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -338,9 +281,8 @@ export default function GamePage() {
         </Card>
       </div>
     );
-  }
 
-  // Main player UI
+  // ---- Main Player UI ----
   const currentQuestion = game.questions[game.currentQuestionIndex];
 
   return (
@@ -372,7 +314,7 @@ export default function GamePage() {
           </Card>
         )}
 
-        {/* ACTIVE - question in progress */}
+        {/* Active - question in progress */}
         {game.status === "active" &&
           !isQuestionFinished &&
           !hasSubmitted &&
@@ -383,7 +325,7 @@ export default function GamePage() {
             />
           )}
 
-        {/* ACTIVE - player submitted */}
+        {/* Active - player submitted */}
         {game.status === "active" && hasSubmitted && !isQuestionFinished && (
           <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
             <CardContent className="pt-6 text-center text-blue-800 dark:text-blue-200">
@@ -392,7 +334,7 @@ export default function GamePage() {
           </Card>
         )}
 
-        {/* ACTIVE - question finished */}
+        {/* Active - question finished */}
         {game.status === "active" &&
           isQuestionFinished &&
           playerAnswerResult && (
@@ -409,13 +351,13 @@ export default function GamePage() {
             </Card>
           )}
 
-        {/* FINISHED */}
+        {/* Finished */}
         {game.status === "finished" && results && (
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle>Quiz Results</CardTitle>
             </CardHeader>
-            <CardContent>{/* Leaderboard / summary here */}</CardContent>
+            <CardContent>{/* Leaderboard / summary */}</CardContent>
           </Card>
         )}
       </div>

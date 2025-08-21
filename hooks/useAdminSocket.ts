@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSocket } from "./useSocket";
 import type { Game, Player, Question } from "@/types";
 
@@ -10,75 +10,71 @@ export const useAdminSocket = (gameId: string) => {
 
   const hasRequestedState = useRef(false);
 
-  const { socket, emit, connected } = useSocket({
-    gameId,
-    isAdmin: true,
-    events: useMemo(
-      () => [
-        {
-          event: "player-joined",
-          callback: ({
-            player,
-            game: updatedGame,
-          }: {
-            player: Player;
-            game: Game;
-          }) => {
-            console.log("[useAdminSocket] player-joined ->", player);
+  const { socket, emit, on, off, connected } = useSocket();
 
-            // 🔹 Solo log y toast opcional
-            // Si querés, podés agregar un toast aquí:
-            // toast(`${player.name} se unió al juego!`);
-          },
-        },
-        {
-          event: "game-updated",
-          callback: ({ game: updatedGame }: { game: Game }) => {
-            console.log("[useAdminSocket] game-updated", updatedGame);
-            setGame(updatedGame); // 🔹 Siempre reemplaza el game completo
-          },
-        },
-        {
-          event: "game-finished",
-          callback: () => {
-            console.log("[useAdminSocket] game-finished");
-            setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
-          },
-        },
-        {
-          event: "game-state",
-          callback: (data: {
-            game: Game;
-            currentQuestion: Question | null;
-            currentQuestionIndex: number;
-            timeLeft: number;
-          }) => {
-            console.log("[useAdminSocket] game-state received:", data);
-
-            const { game: incomingGame, currentQuestionIndex, timeLeft } = data;
-
-            setGame({
-              ...incomingGame,
-              currentQuestionIndex,
-              currentQuestionStartTime:
-                Date.now() - (incomingGame.questionTimeLimit - timeLeft),
-            });
-
-            setLoading(false);
-          },
-        },
-      ],
-      []
-    ),
-  });
-
+  // ---- Listeners
   useEffect(() => {
-    if (!socket || !gameId || !connected || hasRequestedState.current) return;
+    if (!socket || !connected) return;
+
+    // Jugador se une
+    const handlePlayerJoined = (data: { player: Player; game: Game }) => {
+      console.log("[useAdminSocket] player-joined ->", data.player);
+      // opcional: toast(`${data.player.name} se unió al juego`);
+    };
+
+    // Juego actualizado
+    const handleGameUpdated = (data: { game: Game }) => {
+      console.log("[useAdminSocket] game-updated", data.game);
+      setGame(data.game);
+    };
+
+    // Juego finalizado
+    const handleGameFinished = () => {
+      console.log("[useAdminSocket] game-finished");
+      setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
+    };
+
+    // Estado completo del juego
+    const handleGameState = (data: {
+      game: Game;
+      currentQuestion: Question | null;
+      currentQuestionIndex: number;
+      timeLeft: number;
+    }) => {
+      console.log("[useAdminSocket] game-state received:", data);
+      const { game: incomingGame, currentQuestionIndex, timeLeft } = data;
+      setGame({
+        ...incomingGame,
+        currentQuestionIndex,
+        currentQuestionStartTime:
+          Date.now() - (incomingGame.questionTimeLimit - timeLeft),
+      });
+      setLoading(false);
+    };
+
+    // Registrar listeners
+    on("player-joined", handlePlayerJoined);
+    on("game-updated", handleGameUpdated);
+    on("game-finished", handleGameFinished);
+    on("game-state", handleGameState);
+
+    // Cleanup al desmontar
+    return () => {
+      off("player-joined", handlePlayerJoined);
+      off("game-updated", handleGameUpdated);
+      off("game-finished", handleGameFinished);
+      off("game-state", handleGameState);
+    };
+  }, [socket, connected, on, off]);
+
+  // ---- Solicitar estado inicial del juego
+  useEffect(() => {
+    if (!socket || !connected || hasRequestedState.current) return;
 
     console.log("[useAdminSocket] emitting request-game-state", { gameId });
-    socket.emit("request-game-state", { gameId });
+    emit("request-game-state", { gameId });
     hasRequestedState.current = true;
-  }, [socket, gameId, connected]);
+  }, [socket, connected, emit, gameId]);
 
   return { game, setGame, emit, loading };
 };

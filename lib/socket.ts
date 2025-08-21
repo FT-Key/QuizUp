@@ -1,11 +1,12 @@
 import { io, type Socket } from "socket.io-client";
+import type { SocketEvents } from "@/types"; // import de tu types/index
 
-let socket: Socket | null = null;
+let socket: Socket<SocketEvents> | null = null;
 
 /**
  * Inicializa el socket si no está inicializado y lo retorna
  */
-export const initSocket = (): Socket => {
+export const initSocket = (): Socket<SocketEvents> => {
   if (!socket) {
     const SOCKET_URL =
       process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000";
@@ -33,7 +34,7 @@ export const initSocket = (): Socket => {
 /**
  * Retorna el socket si ya fue inicializado
  */
-export const getSocket = (): Socket | null => socket;
+export const getSocket = (): Socket<SocketEvents> | null => socket;
 
 /**
  * Desconecta el socket y limpia la referencia
@@ -44,25 +45,3 @@ export const disconnectSocket = (): void => {
     socket = null;
   }
 };
-
-/**
- * Tipado de eventos de Socket.IO
- */
-export interface SocketEvents {
-  "join-game": { gameId: string; playerId: string };
-  "join-admin": { gameId: string };
-  "submit-answer": {
-    gameId: string;
-    playerId: string;
-    questionId: string;
-    answer: number;
-  };
-  "start-game": { gameId: string };
-  "finish-question": { gameId: string };
-  "player-joined": { player: { id: string; name: string } };
-  "game-started": { question: { text: string; options: string[] } };
-  "answer-submitted": { playerId: string; playerName: string };
-  "game-finished": { results: any };
-  "game-updated": { game: any };
-  error: { message: string };
-}

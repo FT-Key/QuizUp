@@ -11,19 +11,27 @@ import { useAdminSocket } from "@/hooks/useAdminSocket";
 import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 
 export default function AdminPage() {
-  const { gameId } = useParams();
-  const { game, setGame, emit, loading } = useAdminSocket(gameId as string);
+  // ---- Validación de gameId ----
+  const { gameId: rawGameId } = useParams();
+  if (!rawGameId || Array.isArray(rawGameId)) {
+    throw new Error("Invalid gameId in URL");
+  }
+  const gameId = rawGameId; // ahora es seguro como string
+
+  // ---- Hook de socket ----
+  const { game, setGame, emit, loading } = useAdminSocket(gameId);
 
   const [isStarting, setIsStarting] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
+  // ---- Timer de pregunta ----
   const { timeLeft, isFinished } = useQuestionTimer(
     game?.currentQuestionStartTime ?? 0,
     game?.questionTimeLimit ?? 30000
   );
 
   const questionEnded = game?.status !== "active" || isFinished;
-  const currentQuestion = game?.questions[game?.currentQuestionIndex];
+  const currentQuestion = game?.questions[game?.currentQuestionIndex ?? 0];
 
   // ---- Handlers ----
   const handleStartGame = async () => {
@@ -85,6 +93,7 @@ export default function AdminPage() {
     );
   };
 
+  // ---- Loading ----
   if (loading || !game) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -132,7 +141,7 @@ export default function AdminPage() {
 
         <PlayerList players={game.players} gameStatus={game.status} />
 
-        {game.status === "finished" && <Results gameId={gameId as string} />}
+        {game.status === "finished" && <Results gameId={gameId} />}
       </div>
     </div>
   );
