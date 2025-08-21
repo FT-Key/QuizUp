@@ -48,6 +48,7 @@ export default function GamePage() {
           if (foundPlayer) {
             if (!foundPlayer.answers) foundPlayer.answers = {};
             setPlayer(foundPlayer);
+            emit("join-game", { gameId, playerId });
 
             const currentQuestion =
               data.game.questions[data.game.currentQuestionIndex];
