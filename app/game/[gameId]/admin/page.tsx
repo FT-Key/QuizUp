@@ -19,19 +19,18 @@ export default function AdminPage() {
   const gameId = rawGameId; // ahora es seguro como string
 
   // ---- Hook de socket ----
-  const { game, setGame, emit, loading } = useAdminSocket(gameId);
+  const { game, setGame, emit, loading, questionEnded } = useAdminSocket(gameId);
 
   const [isStarting, setIsStarting] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  // ---- Timer de pregunta ----
-  const { timeLeft, isFinished } = useQuestionTimer(
-    game?.currentQuestionStartTime ?? 0,
-    game?.questionTimeLimit ?? 30000
-  );
-
-  const questionEnded = game?.status !== "active" || isFinished;
   const currentQuestion = game?.questions[game?.currentQuestionIndex ?? 0];
+
+  const { timeLeft } = useQuestionTimer(
+    game?.currentQuestionStartTime ?? 0,
+    game?.questionTimeLimit ?? 30000,
+    currentQuestion?.id
+  );
 
   // ---- Handlers ----
   const handleStartGame = async () => {
@@ -39,8 +38,7 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/games/${gameId}/start`, { method: "POST" });
       if (!res.ok) throw new Error("Failed to start game");
-      const data = await res.json();
-      setGame(data.game);
+      // No usamos data.game aquí — el timer se sincroniza via game-started del WS
       emit("start-game", { gameId });
     } catch (err) {
       console.error(err);
@@ -69,28 +67,12 @@ export default function AdminPage() {
 
   const handleNextQuestion = () => {
     emit("next-question", { gameId });
-    setGame((prev) =>
-      prev
-        ? {
-            ...prev,
-            currentQuestionIndex: prev.currentQuestionIndex + 1,
-            currentQuestionStartTime: Date.now(),
-          }
-        : prev
-    );
+    // El estado se actualiza via question-changed o game-finished del servidor
   };
 
   const handleForceEnd = () => {
     emit("finish-question", { gameId });
-    setGame((prev) =>
-      prev
-        ? {
-            ...prev,
-            currentQuestionStartTime:
-              Date.now() - (prev.questionTimeLimit || 30000),
-          }
-        : prev
-    );
+    // El estado se actualiza via question-finished del servidor
   };
 
   // ---- Loading ----
