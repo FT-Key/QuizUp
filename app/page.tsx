@@ -8,16 +8,15 @@ export default function HomePage() {
       <div className="w-full max-w-md space-y-8" style={{ animation: "slide-up 0.6s ease-out" }}>
         {/* Logo */}
         <div className="text-center space-y-4">
-          <div className="inline-block">
-            <h1 
-              className="text-6xl font-black text-white tracking-tight"
-              style={{ 
-                textShadow: "0 4px 20px rgba(0,0,0,0.3)",
-                animation: "bounce-in 0.8s ease-out"
-              }}
-            >
-              QuizUp!
-            </h1>
+          <div 
+            className="inline-block"
+            style={{ animation: "bounce-in 0.8s ease-out" }}
+          >
+            <img 
+              src="/logo-quizup.png" 
+              alt="QuizUp!" 
+              className="h-32 md:h-40 mx-auto drop-shadow-2xl"
+            />
           </div>
           <p className="text-xl text-white/90 font-medium">
             Enter a game code and play with friends!

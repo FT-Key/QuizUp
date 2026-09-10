@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   title: "QuizUp! - Real-time Quiz Game",
   description: "Create and play interactive quizzes in real-time",
   generator: "v0.app",
+  icons: {
+    icon: "/minilogo-quizup.png",
+    apple: "/minilogo-quizup.png",
+  },
 };
 
 export default function RootLayout({
