@@ -304,6 +304,13 @@ export default function GamePage() {
         : prev
     );
     setHasSubmitted(true);
+
+    // Show result immediately (computed locally, no need to wait for server)
+    const isCorrect = answerIndex === currentQuestion.correctAnswer;
+    setPlayerAnswerResult({
+      correct: isCorrect,
+      score: player.score || 0,
+    });
   };
 
   if (loading)
@@ -392,23 +399,9 @@ export default function GamePage() {
             />
           )}
 
-        {/* ACTIVE - player submitted */}
-        {game.status === "active" && hasSubmitted && !isQuestionFinished && (
-          <div 
-            className="bg-white rounded-3xl shadow-xl p-8 text-center"
-            style={{ animation: "bounce-in 0.5s ease-out" }}
-          >
-            <div className="text-5xl mb-4">✓</div>
-            <p className="text-xl font-bold text-[#1368CE]">
-              Answer submitted!
-            </p>
-            <p className="text-gray-500 mt-2">Waiting for other players...</p>
-          </div>
-        )}
-
         {/* ACTIVE - question finished, player answered correctly */}
         {game.status === "active" &&
-          isQuestionFinished &&
+          hasSubmitted &&
           playerAnswerResult && playerAnswerResult.correct && (
             <div 
               className="bg-white rounded-3xl shadow-xl p-8 text-center"
@@ -426,7 +419,7 @@ export default function GamePage() {
 
         {/* ACTIVE - question finished, player answered incorrectly */}
         {game.status === "active" &&
-          isQuestionFinished &&
+          hasSubmitted &&
           playerAnswerResult && !playerAnswerResult.correct && (
             <div 
               className="bg-white rounded-3xl shadow-xl p-8 text-center"
