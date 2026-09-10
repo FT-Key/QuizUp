@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import { AudioPlayer } from "@/components/AudioPlayer";
 
 export const metadata: Metadata = {
   title: "QuizUp! - Real-time Quiz Game",
@@ -35,6 +36,7 @@ export default function RootLayout({
           }}
         />
         <div className="relative min-h-screen">{children}</div>
+        <AudioPlayer />
       </body>
     </html>
   );
