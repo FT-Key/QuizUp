@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Trophy, Users, CheckCircle, XCircle } from "lucide-react";
+import Link from "next/link";
 import type { GameResults } from "@/types";
 
 interface ResultsProps {
@@ -161,7 +162,7 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
       <div className="text-center space-y-4 pb-4">
         <p className="text-white/80 font-medium">Want to play again?</p>
         <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-          <a
+          <Link
             href="/create"
             className="inline-flex items-center justify-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
             style={{
@@ -170,8 +171,8 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
             }}
           >
             Create New Quiz
-          </a>
-          <a
+          </Link>
+          <Link
             href="/"
             className="inline-flex items-center justify-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
             style={{
@@ -180,7 +181,7 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
             }}
           >
             Join Another Game
-          </a>
+          </Link>
         </div>
       </div>
     </div>

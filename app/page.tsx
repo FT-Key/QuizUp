@@ -1,6 +1,7 @@
 "use client"
 
 import { JoinForm } from "@/components/JoinForm"
+import Link from "next/link"
 
 export default function HomePage() {
   return (
@@ -33,7 +34,7 @@ export default function HomePage() {
 
         {/* Create Quiz Link */}
         <div className="text-center">
-          <a
+          <Link
             href="/create"
             className="inline-flex items-center px-6 py-3 text-base font-semibold text-white rounded-full transition-all hover:scale-105"
             style={{ 
@@ -42,7 +43,7 @@ export default function HomePage() {
             }}
           >
             Create a Quiz
-          </a>
+          </Link>
         </div>
       </div>
     </div>

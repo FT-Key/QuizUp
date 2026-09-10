@@ -1,6 +1,7 @@
 "use client"
 
 import { GameForm } from "@/components/GameForm"
+import Link from "next/link"
 
 export default function CreatePage() {
   return (
@@ -36,7 +37,7 @@ export default function CreatePage() {
 
         {/* Back to Join */}
         <div className="text-center">
-          <a
+          <Link
             href="/"
             className="inline-flex items-center px-6 py-3 text-base font-semibold text-white rounded-full transition-all hover:scale-105"
             style={{ 
@@ -45,7 +46,7 @@ export default function CreatePage() {
             }}
           >
             Join a Quiz
-          </a>
+          </Link>
         </div>
       </div>
     </div>
