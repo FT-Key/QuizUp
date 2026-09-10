@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   title: "QuizUp! - Real-time Quiz Game",
   description: "Create and play interactive quizzes in real-time",
   generator: "v0.app",
+  icons: {
+    icon: "/minilogo-quizup.png",
+    apple: "/minilogo-quizup.png",
+  },
 };
 
 export default function RootLayout({
@@ -21,7 +25,10 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable}`}
       style={{ fontFamily: GeistSans.style.fontFamily }}
     >
-      <body className="min-h-screen" style={{ background: 'linear-gradient(135deg, #46178F 0%, #7B2FBE 25%, #1368CE 50%, #26890C 75%, #FFC900 100%)' }}>
+      <body 
+        className="min-h-screen bg-fixed bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/background-quizup.png')" }}
+      >
         <div className="min-h-screen">{children}</div>
       </body>
     </html>

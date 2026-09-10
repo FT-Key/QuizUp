@@ -7,7 +7,14 @@ export default function CreatePage() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4 py-8">
       <div className="w-full max-w-3xl space-y-6" style={{ animation: "slide-up 0.6s ease-out" }}>
         {/* Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
+          <div style={{ animation: "bounce-in 0.6s ease-out" }}>
+            <img 
+              src="/minilogo-quizup.png" 
+              alt="QuizUp!" 
+              className="h-20 md:h-24 mx-auto drop-shadow-xl"
+            />
+          </div>
           <h1 
             className="text-4xl font-black text-white tracking-tight"
             style={{ textShadow: "0 4px 20px rgba(0,0,0,0.3)" }}
