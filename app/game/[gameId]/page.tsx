@@ -1,16 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { QuestionCard } from "@/components/QuestionCard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Results } from "@/components/Results";
 import { Loader2, Users, Clock } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import type { Game, Player, GameResults, Question } from "@/types";
 
-/**
- * GamePage (player)
- */
 export default function GamePage() {
   const params = useParams();
   const gameId = params.gameId as string;
@@ -27,10 +24,8 @@ export default function GamePage() {
     score: number;
   } | null>(null);
 
-  // keep prevQuestionIndex to detect transitions if needed
   const prevQuestionIndexRef = useRef<number | null>(null);
 
-  // ---- Fetch initial game data once
   useEffect(() => {
     const fetchGame = async () => {
       try {
@@ -70,165 +65,186 @@ export default function GamePage() {
     if (gameId) fetchGame();
   }, [gameId]);
 
-  // ---- Socket integration (single call)
+  const emitRef = useRef<((event: string, data?: any) => void) | null>(null);
   const { socket, emit } = useSocket({
     gameId,
-    events: [
-      {
-        // server replies to the joining socket with this event
-        event: "joined",
-        callback: (data: { player: Player; game: Game }) => {
-          console.log("[GamePage] joined received:", data);
-          if (data.player) {
-            localStorage.setItem("playerId", data.player.id);
-            localStorage.setItem("playerName", data.player.name);
-            setPlayer(data.player);
-          }
-          if (data.game) {
-            setGame(data.game);
-            // determine submission state for the current question
-            const curQ = data.game.questions[data.game.currentQuestionIndex];
-            if (data.player && curQ) {
-              setHasSubmitted(
-                Boolean(
-                  data.player.answers &&
-                    data.player.answers[curQ.id] !== undefined
-                )
-              );
+    events: useMemo(
+      () => [
+        {
+          event: "joined",
+          callback: (data: { player: Player; game: Game }) => {
+            console.log("[GamePage] joined received:", data);
+            if (data.player) {
+              localStorage.setItem("playerId", data.player.id);
+              localStorage.setItem("playerName", data.player.name);
+              setPlayer(data.player);
             }
-          }
-          setLoading(false);
-        },
-      },
-      {
-        event: "game-started",
-        callback: (data: {
-          game: Game;
-          players: Player[];
-          currentQuestion: Question;
-        }) => {
-          console.log("[GamePage] game-started:", data);
-          setIsQuestionFinished(false);
-          setHasSubmitted(false);
-          setPlayerAnswerResult(null);
-          setGame(data.game);
-          // if we already have a playerId, make sure to update the local player
-          const pid = localStorage.getItem("playerId");
-          if (pid) {
-            const found = data.game.players.find((p) => p.id === pid);
-            if (found) setPlayer(found);
-          }
-        },
-      },
-      {
-        event: "game-updated",
-        callback: (payload: { game: Game }) => {
-          console.log("[GamePage] game-updated:", payload.game);
-          const updatedGame = payload.game;
-          // update game
-          setGame(updatedGame);
-
-          // update local player object (if we have a player id)
-          const pid = localStorage.getItem("playerId");
-          if (pid) {
-            const found = updatedGame.players.find((p) => p.id === pid);
-            if (found) {
-              setPlayer(found);
-              // check submission status for current question
-              const curQ =
-                updatedGame.questions[updatedGame.currentQuestionIndex];
-              if (curQ) {
+            if (data.game) {
+              setGame(data.game);
+              const curQ = data.game.questions[data.game.currentQuestionIndex];
+              if (data.player && curQ) {
                 setHasSubmitted(
-                  Boolean(found.answers && found.answers[curQ.id] !== undefined)
+                  Boolean(
+                    data.player.answers &&
+                      data.player.answers[curQ.id] !== undefined
+                  )
                 );
               }
             }
-          }
+            setLoading(false);
+          },
+        },
+        {
+          event: "game-started",
+          callback: (data: {
+            game: Game;
+            players: Player[];
+            currentQuestion: Question;
+          }) => {
+            console.log("[GamePage] game-started:", data);
+            setIsQuestionFinished(false);
+            setHasSubmitted(false);
+            setPlayerAnswerResult(null);
+            setGame(data.game);
+            const pid = localStorage.getItem("playerId");
+            if (pid) {
+              const found = data.game.players.find((p) => p.id === pid);
+              if (found) setPlayer(found);
+            }
+          },
+        },
+        {
+          event: "game-updated",
+          callback: (payload: { game: Game }) => {
+            console.log("[GamePage] game-updated:", payload.game);
+            const updatedGame = payload.game;
+            setGame(updatedGame);
 
-          // detect if question finished: if all players answered the current question
-          const curQ = updatedGame.questions[updatedGame.currentQuestionIndex];
-          if (curQ) {
-            const allAnswered = updatedGame.players.every(
-              (p) => p.answers?.[curQ.id] !== undefined
-            );
-            setIsQuestionFinished(allAnswered);
-            // if finished and we have player, compute player's result (if available)
-            if (allAnswered) {
-              const pid2 = localStorage.getItem("playerId");
-              if (pid2) {
-                const me = updatedGame.players.find((p) => p.id === pid2);
-                if (me) {
-                  const playerAns = me.answers?.[curQ.id];
-                  if (playerAns !== undefined) {
+            const pid = localStorage.getItem("playerId");
+            if (pid) {
+              const found = updatedGame.players.find((p) => p.id === pid);
+              if (found) {
+                setPlayer(found);
+                const curQ =
+                  updatedGame.questions[updatedGame.currentQuestionIndex];
+                if (curQ) {
+                  const hasAnswer = found.answers && found.answers[curQ.id] !== undefined;
+                  console.log(`[GamePage] game-updated: player ${found.name} answer for q ${curQ.id}: ${found.answers?.[curQ.id]}, hasAnswer: ${hasAnswer}`);
+                  setHasSubmitted(Boolean(hasAnswer));
+                }
+              }
+            }
+
+            const curQ = updatedGame.questions[updatedGame.currentQuestionIndex];
+            if (curQ) {
+              const allAnswered = updatedGame.players.every(
+                (p) => p.answers?.[curQ.id] !== undefined
+              );
+              console.log(`[GamePage] game-updated: allAnswered=${allAnswered} for q ${curQ.id}`);
+              setIsQuestionFinished(allAnswered);
+              if (allAnswered) {
+                const pid2 = localStorage.getItem("playerId");
+                if (pid2) {
+                  const me = updatedGame.players.find((p) => p.id === pid2);
+                  if (me) {
+                    const playerAns = me.answers?.[curQ.id];
+                    console.log(`[GamePage] game-updated: my answer=${playerAns}, correctAnswer=${curQ.correctAnswer}`);
+                    if (playerAns !== undefined) {
+                      setPlayerAnswerResult({
+                        correct: playerAns === curQ.correctAnswer,
+                        score: me.score || 0,
+                      });
+                    }
+                  }
+                }
+              }
+            }
+
+            prevQuestionIndexRef.current = updatedGame.currentQuestionIndex;
+          },
+        },
+        {
+          event: "question-finished",
+          callback: (data: any) => {
+            console.log("[GamePage] question-finished event:", data);
+            setIsQuestionFinished(true);
+            emitRef.current?.("request-game-state", { gameId });
+          },
+        },
+        {
+          event: "game-state",
+          callback: (payload: {
+            game: Game;
+            currentQuestion: Question | null;
+            currentQuestionIndex: number;
+            timeLeft: number;
+          }) => {
+            console.log("[GamePage] game-state received:", payload);
+            setGame(payload.game);
+            const pid = localStorage.getItem("playerId");
+            if (pid) {
+              const found = payload.game.players.find((p) => p.id === pid);
+              if (found) {
+                setPlayer(found);
+                const curQ = payload.game.questions[payload.currentQuestionIndex];
+                if (curQ) {
+                  setHasSubmitted(
+                    Boolean(found.answers && found.answers[curQ.id] !== undefined)
+                  );
+                  if (found.answers?.[curQ.id] !== undefined) {
                     setPlayerAnswerResult({
-                      correct: playerAns === curQ.correctAnswer,
-                      score: me.score || 0,
+                      correct: found.answers[curQ.id] === curQ.correctAnswer,
+                      score: found.score || 0,
                     });
                   }
                 }
               }
             }
-          }
-
-          // update prevQuestionIndex
-          prevQuestionIndexRef.current = updatedGame.currentQuestionIndex;
+          },
         },
-      },
-      {
-        event: "question-finished",
-        callback: (data: any) => {
-          console.log("[GamePage] question-finished event:", data);
-          // mark question as finished locally, then request full game-state to be safe
-          setIsQuestionFinished(true);
-          // request the authoritative game-state from the server for latest scores/players
-          emit("request-game-state", { gameId });
+        {
+          event: "join-error",
+          callback: (payload: any) => {
+            console.error("[GamePage] join-error:", payload);
+            alert(payload?.message || "Failed to join the game");
+          },
         },
-      },
-      {
-        // handler for game-state responses (from request-game-state)
-        event: "game-state",
-        callback: (payload: {
-          game: Game;
-          currentQuestion: Question | null;
-          currentQuestionIndex: number;
-          timeLeft: number;
-        }) => {
-          console.log("[GamePage] game-state received:", payload);
-          setGame(payload.game);
-          const pid = localStorage.getItem("playerId");
-          if (pid) {
-            const found = payload.game.players.find((p) => p.id === pid);
-            if (found) {
-              setPlayer(found);
-              const curQ = payload.game.questions[payload.currentQuestionIndex];
-              if (curQ) {
-                setHasSubmitted(
-                  Boolean(found.answers && found.answers[curQ.id] !== undefined)
-                );
-                // if question just finished, compute result for display
-                if (found.answers?.[curQ.id] !== undefined) {
-                  setPlayerAnswerResult({
-                    correct: found.answers[curQ.id] === curQ.correctAnswer,
-                    score: found.score || 0,
-                  });
-                }
-              }
+        {
+          event: "game-finished",
+          callback: (data: { game: Game; results: GameResults }) => {
+            console.log("[GamePage] game-finished:", data);
+            if (data.game) {
+              setGame(data.game);
+            } else {
+              setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
             }
-          }
+            if (data.results) {
+              setResults(data.results);
+            }
+          },
         },
-      },
-      {
-        // generic error when join fails
-        event: "join-error",
-        callback: (payload: any) => {
-          console.error("[GamePage] join-error:", payload);
-          alert(payload?.message || "Failed to join the game");
+        {
+          event: "question-changed",
+          callback: (data: { question: Question; questionIndex: number; timeLeft: number }) => {
+            console.log("[GamePage] question-changed:", data);
+            setIsQuestionFinished(false);
+            setHasSubmitted(false);
+            setPlayerAnswerResult(null);
+            setGame((prev) => {
+              if (!prev) return prev;
+              return { ...prev, currentQuestionIndex: data.questionIndex };
+            });
+          },
         },
-      },
-    ],
+      ],
+      [gameId]
+    ),
   });
 
-  // ---- Join form component (renders when !player)
+  useEffect(() => {
+    emitRef.current = emit;
+  }, [emit]);
+
   function JoinForm() {
     const [name, setName] = useState<string>(() => {
       return localStorage.getItem("playerName") || "";
@@ -238,45 +254,39 @@ export default function GamePage() {
       e.preventDefault();
       const trimmed = name.trim();
       if (!trimmed || !emit) return;
-      console.log("[JoinForm] emitting join-game:", {
-        gameId,
-        playerName: trimmed,
-      });
       emit("join-game", { gameId, playerName: trimmed });
-      // server will reply with 'joined' which updates state and localStorage
     };
 
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block text-sm font-medium">Your name</label>
+        <label className="block text-sm font-bold text-white uppercase tracking-wide">
+          Your Name
+        </label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full border rounded p-2"
+          className="w-full px-4 py-3 text-lg font-medium border-3 border-white/30 rounded-2xl bg-white/20 text-white placeholder-white/60 focus:border-white focus:ring-4 focus:ring-white/30 transition-all outline-none"
+          style={{ borderWidth: "3px" }}
           placeholder="Enter a display name..."
         />
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white rounded py-2"
+          className="w-full py-4 text-lg font-black text-white rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+          style={{
+            background: "linear-gradient(135deg, #1368CE 0%, #0D47A1 100%)",
+            boxShadow: "0 6px 20px rgba(19, 104, 206, 0.4)",
+          }}
         >
-          Join Game
+          JOIN GAME
         </button>
       </form>
     );
   }
 
-  // ---- Submit answer
   const handleAnswerSubmit = (answerIndex: number) => {
     if (!player || !game) return;
     const currentQuestion = game.questions[game.currentQuestionIndex];
     if (!currentQuestion) return;
-
-    console.log("[GamePage] submit-answer emit:", {
-      gameId,
-      playerId: player.id,
-      questionId: currentQuestion.id,
-      answer: answerIndex,
-    });
 
     emit("submit-answer", {
       gameId,
@@ -285,7 +295,6 @@ export default function GamePage() {
       answer: answerIndex,
     });
 
-    // optimistic update local player answers so UI responds instantly
     setPlayer((prev) =>
       prev
         ? {
@@ -297,13 +306,12 @@ export default function GamePage() {
     setHasSubmitted(true);
   };
 
-  // ---- Loading / Error handling
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-          <p className="text-gray-600 dark:text-gray-300">Loading game...</p>
+          <Loader2 className="h-12 w-12 animate-spin mx-auto text-white" />
+          <p className="text-xl font-bold text-white">Loading game...</p>
         </div>
       </div>
     );
@@ -311,65 +319,66 @@ export default function GamePage() {
   if (error || !game)
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-red-600">Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-gray-600 dark:text-gray-300">
-              {error || "Game not found"}
-            </p>
-          </CardContent>
-        </Card>
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 text-center">
+          <h2 className="text-2xl font-black text-[#E21B3C] mb-4">Error</h2>
+          <p className="text-gray-600">{error || "Game not found"}</p>
+        </div>
       </div>
     );
 
-  // If player is not set yet, show join form
   if (!player) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center">Join the Quiz</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <JoinForm />
-          </CardContent>
-        </Card>
+        <div 
+          className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8"
+          style={{ animation: "bounce-in 0.6s ease-out" }}
+        >
+          <h2 className="text-2xl font-black text-center text-gray-800 mb-6">
+            Join the Quiz
+          </h2>
+          <JoinForm />
+        </div>
       </div>
     );
   }
 
-  // Main player UI
   const currentQuestion = game.questions[game.currentQuestionIndex];
 
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Game Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+        <div 
+          className="text-center space-y-3 py-6 px-8 bg-white/15 backdrop-blur-sm rounded-3xl"
+          style={{ animation: "slide-up 0.5s ease-out" }}
+        >
+          <h1 className="text-3xl md:text-4xl font-black text-white" style={{ textShadow: "0 2px 10px rgba(0,0,0,0.2)" }}>
             {game.name}
           </h1>
-          <div className="flex items-center justify-center space-x-6 text-sm text-gray-600 dark:text-gray-300">
-            <div className="flex items-center space-x-1">
-              <Users className="h-4 w-4" />
+          <div className="flex items-center justify-center space-x-6 text-base font-bold">
+            <div className="flex items-center space-x-2 text-white/90">
+              <Users className="h-5 w-5" />
               <span>{game.players.length} players</span>
             </div>
-            <div className="flex items-center space-x-1">
-              <Clock className="h-4 w-4" />
-              <span className="capitalize">{game.status}</span>
+            <div className="flex items-center space-x-2 text-white/90">
+              <Clock className="h-5 w-5" />
+              <span className="capitalize px-3 py-1 bg-white/20 rounded-full">{game.status}</span>
             </div>
           </div>
         </div>
 
         {/* Waiting */}
         {game.status === "waiting" && (
-          <Card className="bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800">
-            <CardContent className="pt-6 text-center text-yellow-800 dark:text-yellow-200">
+          <div 
+            className="bg-white rounded-3xl shadow-xl p-8 text-center"
+            style={{ animation: "bounce-in 0.6s ease-out" }}
+          >
+            <div className="text-5xl mb-4">⏳</div>
+            <p className="text-xl font-bold text-gray-800">
               Waiting for the game to start...
-            </CardContent>
-          </Card>
+            </p>
+            <p className="text-gray-500 mt-2">The host will start the quiz soon</p>
+          </div>
         )}
 
         {/* ACTIVE - question in progress */}
@@ -385,38 +394,71 @@ export default function GamePage() {
 
         {/* ACTIVE - player submitted */}
         {game.status === "active" && hasSubmitted && !isQuestionFinished && (
-          <Card className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
-            <CardContent className="pt-6 text-center text-blue-800 dark:text-blue-200">
-              Answer submitted! Waiting for other players...
-            </CardContent>
-          </Card>
+          <div 
+            className="bg-white rounded-3xl shadow-xl p-8 text-center"
+            style={{ animation: "bounce-in 0.5s ease-out" }}
+          >
+            <div className="text-5xl mb-4">✓</div>
+            <p className="text-xl font-bold text-[#1368CE]">
+              Answer submitted!
+            </p>
+            <p className="text-gray-500 mt-2">Waiting for other players...</p>
+          </div>
         )}
 
-        {/* ACTIVE - question finished */}
+        {/* ACTIVE - question finished, player answered correctly */}
         {game.status === "active" &&
           isQuestionFinished &&
-          playerAnswerResult && (
-            <Card className="bg-gray-50 border-gray-200 dark:bg-gray-800/20 dark:border-gray-700">
-              <CardContent className="pt-6 text-center text-gray-800 dark:text-gray-200">
-                {playerAnswerResult.correct ? (
-                  <p className="text-green-600 dark:text-green-400">
-                    Correct! +{playerAnswerResult.score} points
-                  </p>
-                ) : (
-                  <p className="text-red-600 dark:text-red-400">Incorrect!</p>
-                )}
-              </CardContent>
-            </Card>
+          playerAnswerResult && playerAnswerResult.correct && (
+            <div 
+              className="bg-white rounded-3xl shadow-xl p-8 text-center"
+              style={{ animation: "bounce-in 0.5s ease-out" }}
+            >
+              <div className="text-6xl mb-4">🎉</div>
+              <p className="text-3xl font-black text-[#26890C]">
+                Correct!
+              </p>
+              <p className="text-xl font-bold text-[#26890C]/80 mt-2">
+                +{playerAnswerResult.score} points
+              </p>
+            </div>
+          )}
+
+        {/* ACTIVE - question finished, player answered incorrectly */}
+        {game.status === "active" &&
+          isQuestionFinished &&
+          playerAnswerResult && !playerAnswerResult.correct && (
+            <div 
+              className="bg-white rounded-3xl shadow-xl p-8 text-center"
+              style={{ animation: "bounce-in 0.5s ease-out" }}
+            >
+              <div className="text-6xl mb-4">✗</div>
+              <p className="text-3xl font-black text-[#E21B3C]">
+                Incorrect!
+              </p>
+              <p className="text-gray-500 mt-2">Better luck next time!</p>
+            </div>
+          )}
+
+        {/* ACTIVE - question finished, player did NOT answer */}
+        {game.status === "active" &&
+          isQuestionFinished &&
+          !playerAnswerResult && (
+            <div 
+              className="bg-white rounded-3xl shadow-xl p-8 text-center"
+              style={{ animation: "bounce-in 0.5s ease-out" }}
+            >
+              <div className="text-5xl mb-4">⏰</div>
+              <p className="text-xl font-bold text-[#FFC900]">
+                Time&apos;s up!
+              </p>
+              <p className="text-gray-500 mt-2">You didn&apos;t submit an answer.</p>
+            </div>
           )}
 
         {/* FINISHED */}
-        {game.status === "finished" && results && (
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle>Quiz Results</CardTitle>
-            </CardHeader>
-            <CardContent>{/* Leaderboard / summary here */}</CardContent>
-          </Card>
+        {game.status === "finished" && (
+          <Results gameId={gameId} results={results} />
         )}
       </div>
     </div>

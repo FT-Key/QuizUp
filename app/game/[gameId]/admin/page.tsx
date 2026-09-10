@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { GameInfo } from "@/components/admin/GameInfo";
 import { GameControls } from "@/components/admin/GameControls";
@@ -12,10 +12,39 @@ import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 
 export default function AdminPage() {
   const { gameId } = useParams();
-  const { game, setGame, emit, loading } = useAdminSocket(gameId as string);
+  const { game, setGame, emit, loading, results } = useAdminSocket(gameId as string);
 
   const [isStarting, setIsStarting] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+
+  // Debug: log game state changes
+  useEffect(() => {
+    if (game) {
+      console.log("[AdminPage] game state changed:", {
+        status: game.status,
+        currentQuestionIndex: game.currentQuestionIndex,
+        players: game.players.map((p) => ({
+          name: p.name,
+          id: p.id,
+          answers: p.answers,
+          score: p.score,
+        })),
+      });
+      if (game.players.length > 0) {
+        const q = game.questions[game.currentQuestionIndex];
+        console.log("[AdminPage] currentQuestion:", q?.id, "correctAnswer:", q?.correctAnswer);
+        for (const p of game.players) {
+          console.log(`[AdminPage] player ${p.name} answer for q ${q?.id}:`, p.answers?.[q?.id]);
+        }
+      }
+    }
+  }, [game]);
+
+  useEffect(() => {
+    if (results) {
+      console.log("[AdminPage] results:", JSON.stringify(results, null, 2));
+    }
+  }, [results]);
 
   const { timeLeft, isFinished } = useQuestionTimer(
     game?.currentQuestionStartTime ?? 0,
@@ -45,11 +74,6 @@ export default function AdminPage() {
   const handleFinishGame = async () => {
     setIsFinishing(true);
     try {
-      const res = await fetch(`/api/games/${gameId}/finish`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to finish game");
-      setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
       emit("finish-game", { gameId });
     } catch (err) {
       console.error(err);
@@ -130,9 +154,9 @@ export default function AdminPage() {
           />
         )}
 
-        <PlayerList players={game.players} gameStatus={game.status} />
+        <PlayerList players={game.players} gameStatus={game.status} currentQuestion={currentQuestion} />
 
-        {game.status === "finished" && <Results gameId={gameId as string} />}
+        {game.status === "finished" && <Results gameId={gameId as string} results={results} />}
       </div>
     </div>
   );

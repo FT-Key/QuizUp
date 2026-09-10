@@ -1,32 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Trophy, Users } from "lucide-react";
+import { Trophy, Users, CheckCircle, XCircle } from "lucide-react";
 import type { GameResults } from "@/types";
 
 interface ResultsProps {
   gameId: string;
+  results?: GameResults | null;
 }
 
-export function Results({ gameId }: ResultsProps) {
-  const [results, setResults] = useState<GameResults | null>(null);
-  const [loading, setLoading] = useState(true);
+export function Results({ gameId, results: resultsProp }: ResultsProps) {
+  const [fetchedResults, setFetchedResults] = useState<GameResults | null>(null);
+  const [loading, setLoading] = useState(!resultsProp);
 
   useEffect(() => {
+    if (resultsProp) {
+      setFetchedResults(resultsProp);
+      setLoading(false);
+      return;
+    }
     const fetchResults = async () => {
       try {
         const response = await fetch(`/api/games/${gameId}/results`);
         if (response.ok) {
           const data = await response.json();
-          setResults(data.results);
+          setFetchedResults(data.results);
         }
       } catch (error) {
         console.error("Error fetching results:", error);
@@ -36,29 +34,23 @@ export function Results({ gameId }: ResultsProps) {
     };
 
     fetchResults();
-  }, [gameId]);
+  }, [gameId, resultsProp]);
+
+  const results = resultsProp || fetchedResults;
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-center text-gray-600 dark:text-gray-300">
-            Loading results...
-          </p>
-        </CardContent>
-      </Card>
+      <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
+        <p className="text-lg font-bold text-gray-600">Loading results...</p>
+      </div>
     );
   }
 
   if (!results) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-center text-gray-600 dark:text-gray-300">
-            No results available
-          </p>
-        </CardContent>
-      </Card>
+      <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
+        <p className="text-lg font-bold text-gray-600">No results available</p>
+      </div>
     );
   }
 
@@ -70,112 +62,122 @@ export function Results({ gameId }: ResultsProps) {
       : 0;
 
   return (
-    <div className="space-y-6">
-      {/* Overall Results */}
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
-            <span>Quiz Results</span>
-          </CardTitle>
-          <CardDescription>See how everyone performed</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <div className="flex items-center justify-center space-x-1 mb-2">
-                <Users className="h-4 w-4 text-blue-600" />
-                <span className="text-sm text-blue-600 dark:text-blue-400">
-                  Total Players
-                </span>
-              </div>
-              <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                {results.totalPlayers}
-              </p>
-            </div>
-            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <div className="flex items-center justify-center space-x-1 mb-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-sm text-green-600 dark:text-green-400">
-                  Correct Answers
-                </span>
-              </div>
-              <p className="text-2xl font-bold text-green-700 dark:text-green-300">
-                {results.leaderboard.reduce(
-                  (acc, p) => acc + p.correctAnswers,
-                  0
-                )}
-              </p>
-            </div>
-            <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="flex items-center justify-center space-x-1 mb-2">
-                <Trophy className="h-4 w-4 text-purple-600" />
-                <span className="text-sm text-purple-600 dark:text-purple-400">
-                  Accuracy
-                </span>
-              </div>
-              <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
-                {accuracy.toFixed(1)}%
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-6" style={{ animation: "bounce-in 0.6s ease-out" }}>
+      {/* Trophy Header */}
+      <div className="text-center py-6 bg-white/15 backdrop-blur-sm rounded-3xl">
+        <div className="text-6xl mb-3">🏆</div>
+        <h2 className="text-3xl font-black text-white" style={{ textShadow: "0 2px 10px rgba(0,0,0,0.2)" }}>
+          Quiz Results
+        </h2>
+        <p className="text-white/80 font-medium mt-1">See how everyone performed</p>
+      </div>
 
-      {/* Individual Results */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Player Results</CardTitle>
-          <CardDescription>Individual performance breakdown</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {results.leaderboard.map((player) => {
-              const allCorrect =
-                player.correctAnswers === results.totalQuestions;
-              return (
-                <div
-                  key={player.playerId}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="flex-shrink-0">
+      {/* Overall Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl p-5 text-center shadow-lg">
+          <div className="flex items-center justify-center mb-2">
+            <Users className="h-6 w-6 text-[#1368CE]" />
+          </div>
+          <p className="text-sm font-bold text-gray-500 uppercase">Players</p>
+          <p className="text-3xl font-black text-[#1368CE]">{results.totalPlayers}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 text-center shadow-lg">
+          <div className="flex items-center justify-center mb-2">
+            <CheckCircle className="h-6 w-6 text-[#26890C]" />
+          </div>
+          <p className="text-sm font-bold text-gray-500 uppercase">Correct</p>
+          <p className="text-3xl font-black text-[#26890C]">
+            {results.leaderboard.reduce((acc, p) => acc + p.correctAnswers, 0)}
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 text-center shadow-lg">
+          <div className="flex items-center justify-center mb-2">
+            <Trophy className="h-6 w-6 text-[#FFC900]" />
+          </div>
+          <p className="text-sm font-bold text-gray-500 uppercase">Accuracy</p>
+          <p className="text-3xl font-black text-[#864CBF]">{accuracy.toFixed(0)}%</p>
+        </div>
+      </div>
+
+      {/* Leaderboard */}
+      <div className="bg-white rounded-3xl shadow-xl p-6">
+        <h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2">
+          <span>🏅</span> Leaderboard
+        </h3>
+        <div className="space-y-3">
+          {results.leaderboard.map((player, index) => {
+            const allCorrect = player.correctAnswers === results.totalQuestions;
+            return (
+              <div
+                key={player.playerId}
+                className={`flex items-center justify-between p-4 rounded-2xl transition-all ${
+                  index === 0
+                    ? "bg-gradient-to-r from-[#FFC900]/20 to-[#FFC900]/10 border-2 border-[#FFC900]/50"
+                    : "bg-gray-50 border-2 border-transparent"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  {/* Rank */}
+                  <div 
+                    className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ${
+                      index === 0 
+                        ? "bg-[#FFC900] text-white" 
+                        : index === 1 
+                          ? "bg-gray-300 text-gray-700" 
+                          : index === 2 
+                            ? "bg-[#CD7F32] text-white" 
+                            : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {index + 1}
+                  </div>
+                  {/* Name + status */}
+                  <div>
+                    <span className="font-bold text-gray-800">{player.name}</span>
+                    <div className="flex items-center gap-1 mt-0.5">
                       {allCorrect ? (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        <span className="text-xs font-bold text-[#26890C] flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" /> All Correct
+                        </span>
                       ) : (
-                        <XCircle className="h-5 w-5 text-red-500" />
+                        <span className="text-xs font-bold text-gray-500">
+                          {player.correctAnswers}/{results.totalQuestions} correct
+                        </span>
                       )}
                     </div>
-                    <span className="font-medium">{player.name}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="default">Score: {player.score}</Badge>
-                    <Badge variant={allCorrect ? "default" : "destructive"}>
-                      {allCorrect
-                        ? "All Correct"
-                        : `${player.correctAnswers}/${results.totalQuestions} Correct`}
-                    </Badge>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                <div className="text-right">
+                  <span className="text-2xl font-black text-[#864CBF]">{player.score}</span>
+                  <span className="text-xs font-bold text-gray-400 block">pts</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Actions */}
-      <div className="text-center space-y-4">
-        <p className="text-gray-600 dark:text-gray-300">Want to play again?</p>
-        <div className="space-x-4">
+      <div className="text-center space-y-4 pb-4">
+        <p className="text-white/80 font-medium">Want to play again?</p>
+        <div className="flex justify-center gap-4">
           <a
-            href="/"
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
+            href="/create"
+            className="inline-flex items-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
+            style={{
+              background: "linear-gradient(135deg, #864CBF 0%, #46178F 100%)",
+              boxShadow: "0 4px 15px rgba(70, 23, 143, 0.4)",
+            }}
           >
             Create New Quiz
           </a>
           <a
-            href="/join"
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
+            href="/"
+            className="inline-flex items-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
+            style={{
+              background: "linear-gradient(135deg, #1368CE 0%, #0D47A1 100%)",
+              boxShadow: "0 4px 15px rgba(19, 104, 206, 0.4)",
+            }}
           >
             Join Another Game
           </a>

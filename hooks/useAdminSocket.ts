@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "./useSocket";
-import type { Game, Player, Question } from "@/types";
+import type { Game, Player, Question, GameResults } from "@/types";
 
 export const useAdminSocket = (gameId: string) => {
   const [game, setGame] = useState<Game | null>(null);
+  const [results, setResults] = useState<GameResults | null>(null);
   const [loading, setLoading] = useState(true);
 
   const hasRequestedState = useRef(false);
@@ -34,15 +35,26 @@ export const useAdminSocket = (gameId: string) => {
         {
           event: "game-updated",
           callback: ({ game: updatedGame }: { game: Game }) => {
-            console.log("[useAdminSocket] game-updated", updatedGame);
-            setGame(updatedGame); // 🔹 Siempre reemplaza el game completo
+            console.log("[useAdminSocket] game-updated, status:", updatedGame.status);
+            console.log("[useAdminSocket] game-updated, players:", updatedGame.players.map((p) => ({
+              name: p.name, id: p.id, answers: p.answers, score: p.score,
+            })));
+            setGame(updatedGame);
           },
         },
         {
           event: "game-finished",
-          callback: () => {
-            console.log("[useAdminSocket] game-finished");
-            setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
+          callback: (data: { game: Game; results: GameResults }) => {
+            console.log("[useAdminSocket] game-finished, game:", data.game);
+            console.log("[useAdminSocket] game-finished, results:", data.results);
+            if (data.game) {
+              setGame(data.game);
+            } else {
+              setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
+            }
+            if (data.results) {
+              setResults(data.results);
+            }
           },
         },
         {
@@ -80,5 +92,5 @@ export const useAdminSocket = (gameId: string) => {
     hasRequestedState.current = true;
   }, [socket, gameId, connected]);
 
-  return { game, setGame, emit, loading };
+  return { game, setGame, emit, loading, results };
 };

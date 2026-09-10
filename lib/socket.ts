@@ -12,6 +12,9 @@ export const initSocket = (): Socket => {
 
     socket = io(SOCKET_URL, {
       transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
     });
 
     socket.on("connect", () => {

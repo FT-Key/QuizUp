@@ -32,7 +32,21 @@ export const useSocket = ({
   const socket = socketRef.current;
 
   useEffect(() => {
-    const handleConnect = () => setConnected(true);
+    const handleConnect = () => {
+      setConnected(true);
+      // Re-join room on reconnect
+      if (isAdmin) {
+        console.log("Re-joining game as ADMIN:", { gameId });
+        socket.emit("join-admin", gameId);
+      } else {
+        const name = playerName || localStorage.getItem("playerName");
+        const savedPlayerId = localStorage.getItem("playerId");
+        if (name) {
+          console.log("Re-joining game as PLAYER:", { gameId, name, savedPlayerId });
+          socket.emit("join-game", { gameId, playerId: savedPlayerId, playerName: name });
+        }
+      }
+    };
     const handleDisconnect = () => setConnected(false);
 
     socket.on("connect", handleConnect);
@@ -41,22 +55,8 @@ export const useSocket = ({
     return () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
-      console.log("Socket core listeners cleaned up");
     };
-  }, []);
-
-  useEffect(() => {
-    // Solo emitimos join cuando el socket realmente está conectado
-    if (!socket.connected) return;
-
-    if (isAdmin) {
-      console.log("Joining game as ADMIN:", { gameId });
-      socket.emit("join-admin", gameId);
-    } else if (playerName) {
-      console.log("Joining game as PLAYER:", { gameId, playerName });
-      socket.emit("join-game", { gameId, playerName });
-    }
-  }, [socket.connected, gameId, isAdmin, playerName]);
+  }, [gameId, isAdmin]);
 
   useEffect(() => {
     // registrar listeners personalizados
