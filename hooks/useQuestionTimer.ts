@@ -1,19 +1,32 @@
 import { useEffect, useState, useRef } from "react";
 
-export function useQuestionTimer(startTime: number, timeLimit: number) {
-  const [timeLeft, setTimeLeft] = useState(
-    Math.max(0, timeLimit - (Date.now() - startTime))
-  );
+export function useQuestionTimer(startTime: number, timeLimit: number, questionId?: string) {
+  const [timeLeft, setTimeLeft] = useState(timeLimit);
   const [isFinished, setIsFinished] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Trackear el último (questionId+startTime) que arrancó el timer
+  const lastKeyRef = useRef("");
 
   useEffect(() => {
-    setTimeLeft(Math.max(0, timeLimit - (Date.now() - startTime)));
-    setIsFinished(false);
+    const key = `${questionId ?? ""}:${startTime}`;
+
+    // Si no hay startTime válido, mostrar tiempo completo y parar
+    if (startTime <= 0) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setTimeLeft(timeLimit);
+      setIsFinished(false);
+      lastKeyRef.current = key;
+      return;
+    }
+
+    // Evitar reiniciar si ya estamos corriendo para este mismo (pregunta+startTime)
+    if (key === lastKeyRef.current && intervalRef.current) return;
+    lastKeyRef.current = key;
 
     if (intervalRef.current) clearInterval(intervalRef.current);
+    setIsFinished(false);
 
-    intervalRef.current = setInterval(() => {
+    const tick = () => {
       const remaining = timeLimit - (Date.now() - startTime);
       if (remaining <= 0) {
         setTimeLeft(0);
@@ -22,12 +35,15 @@ export function useQuestionTimer(startTime: number, timeLimit: number) {
       } else {
         setTimeLeft(remaining);
       }
-    }, 100);
+    };
+
+    tick();
+    intervalRef.current = setInterval(tick, 100);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [startTime, timeLimit]);
+  }, [questionId, startTime, timeLimit]);
 
   return { timeLeft, isFinished };
 }
