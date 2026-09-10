@@ -45,14 +45,14 @@ export function QuestionCard({ question, onAnswerSubmit }: QuestionCardProps) {
       </div>
 
       {/* Answer Options Grid - 2x2 */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {question.options.map((option, index) => (
           <button
             key={index}
             onClick={() => handleSelect(index)}
             disabled={selectedAnswer !== null}
             className={`
-              relative rounded-3xl p-6 min-h-[140px] flex flex-col items-center justify-center text-center
+              relative rounded-3xl p-5 sm:p-6 min-h-[120px] sm:min-h-[140px] flex flex-col items-center justify-center text-center
               transition-all duration-200 
               ${selectedAnswer === index 
                 ? "scale-95 ring-4 ring-white shadow-2xl" 

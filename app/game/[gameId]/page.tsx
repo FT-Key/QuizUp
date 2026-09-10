@@ -356,20 +356,20 @@ export default function GamePage() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Game Header */}
         <div 
-          className="text-center space-y-3 py-6 px-8 bg-white/15 backdrop-blur-sm rounded-3xl"
+          className="text-center space-y-3 py-4 sm:py-6 px-4 sm:px-8 bg-white/15 backdrop-blur-sm rounded-3xl"
           style={{ animation: "slide-up 0.5s ease-out" }}
         >
-          <h1 className="text-3xl md:text-4xl font-black text-white" style={{ textShadow: "0 2px 10px rgba(0,0,0,0.2)" }}>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white" style={{ textShadow: "0 2px 10px rgba(0,0,0,0.2)" }}>
             {game.name}
           </h1>
-          <div className="flex items-center justify-center space-x-6 text-base font-bold">
+          <div className="flex items-center justify-center flex-wrap gap-3 sm:gap-6 text-sm sm:text-base font-bold">
             <div className="flex items-center space-x-2 text-white/90">
-              <Users className="h-5 w-5" />
+              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
               <span>{game.players.length} players</span>
             </div>
             <div className="flex items-center space-x-2 text-white/90">
-              <Clock className="h-5 w-5" />
-              <span className="capitalize px-3 py-1 bg-white/20 rounded-full">{game.status}</span>
+              <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="capitalize px-2 sm:px-3 py-1 bg-white/20 rounded-full">{game.status}</span>
             </div>
           </div>
         </div>

@@ -10,7 +10,7 @@ export default function CreatePage() {
         <div className="text-center space-y-3">
           <div style={{ animation: "bounce-in 0.6s ease-out" }}>
             <img 
-              src="/minilogo-quizup.png" 
+              src="/logo-quizup.png" 
               alt="QuizUp!" 
               className="h-20 md:h-24 mx-auto drop-shadow-xl"
             />

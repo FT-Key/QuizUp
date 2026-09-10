@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 
-// Singleton audio element — lives outside React so it survives navigation
 let audioInstance: HTMLAudioElement | null = null;
 
 function getAudio(): HTMLAudioElement {
@@ -12,14 +11,15 @@ function getAudio(): HTMLAudioElement {
     audioInstance.loop = true;
     audioInstance.preload = "auto";
     audioInstance.volume = 0.4;
+    audioInstance.muted = true;
   }
   return audioInstance;
 }
 
 export function AudioPlayer() {
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [volume, setVolume] = useState(40);
-  const [hovered, setHovered] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const audio = getAudio();
@@ -53,46 +53,37 @@ export function AudioPlayer() {
     setMuted(audio.muted);
   }, []);
 
-  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const audio = getAudio();
-    const val = Number(e.target.value);
-    audio.volume = val / 100;
-    setVolume(val);
-    if (val === 0) {
-      audio.muted = true;
-      setMuted(true);
-    } else if (audio.muted) {
-      audio.muted = false;
-      setMuted(false);
-    }
-  }, []);
+  const handleVolumeChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const audio = getAudio();
+      const val = Number(e.target.value);
+      audio.volume = val / 100;
+      setVolume(val);
+      if (val === 0) {
+        audio.muted = true;
+        setMuted(true);
+      } else if (audio.muted) {
+        audio.muted = false;
+        setMuted(false);
+      }
+    },
+    []
+  );
 
   return (
     <div
-      className="fixed bottom-5 right-5 z-50 flex items-center gap-2"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className="fixed bottom-5 right-5 z-50 flex flex-col items-center gap-2"
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
     >
-      {/* Volume slider — appears on hover */}
-      <div
-        className={`flex items-center bg-white/20 backdrop-blur-md rounded-full px-1 py-1 border border-white/20 shadow-lg transition-all duration-300 overflow-hidden ${
-          hovered ? "opacity-100 w-28" : "opacity-0 w-0"
-        }`}
-      >
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={volume}
-          onChange={handleVolumeChange}
-          className="w-full h-1 accent-white cursor-pointer"
-        />
-      </div>
-
       {/* Mute/unmute button */}
       <button
         onClick={toggleMute}
-        className="bg-white/20 backdrop-blur-md text-white p-3 rounded-full shadow-lg hover:bg-white/30 transition-all border border-white/20 flex-shrink-0"
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          setExpanded((prev) => !prev);
+        }}
+        className="bg-white/20 backdrop-blur-md text-white p-3 rounded-full shadow-lg hover:bg-white/30 active:bg-white/40 transition-all border border-white/20"
         aria-label={muted ? "Unmute" : "Mute"}
       >
         {muted ? (
@@ -101,6 +92,28 @@ export function AudioPlayer() {
           <Volume2 className="h-5 w-5" />
         )}
       </button>
+
+      {/* Volume slider — vertical, above the button */}
+      <div
+        className={`flex flex-col items-center bg-white/20 backdrop-blur-md rounded-full border border-white/20 shadow-lg transition-all duration-300 overflow-hidden ${
+          expanded ? "opacity-100 h-32 py-2" : "opacity-0 h-0"
+        }`}
+      >
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={volume}
+          onChange={handleVolumeChange}
+          className="w-24 h-24 cursor-pointer"
+          style={{
+            writingMode: "vertical-lr",
+            direction: "rtl",
+            WebkitAppearance: "slider-vertical",
+            appearance: "slider-vertical",
+          }}
+        />
+      </div>
     </div>
   );
 }

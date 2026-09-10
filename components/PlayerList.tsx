@@ -85,7 +85,7 @@ export function PlayerList({
                 </div>
 
                 {/* Estado y respuestas */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
                   {gameStatus === "waiting" && (
                     <Badge
                       variant="secondary"
@@ -118,7 +118,7 @@ export function PlayerList({
                   )}
 
                   {gameStatus === "finished" && (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 sm:space-x-2 flex-wrap gap-1">
                       <Badge variant="outline">
                         Answer:{" "}
                         {currentAnswer !== undefined

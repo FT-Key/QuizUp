@@ -73,53 +73,53 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
       </div>
 
       {/* Overall Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl p-5 text-center shadow-lg">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-white rounded-2xl p-3 sm:p-5 text-center shadow-lg">
           <div className="flex items-center justify-center mb-2">
-            <Users className="h-6 w-6 text-[#1368CE]" />
+            <Users className="h-5 w-5 sm:h-6 sm:w-6 text-[#1368CE]" />
           </div>
-          <p className="text-sm font-bold text-gray-500 uppercase">Players</p>
-          <p className="text-3xl font-black text-[#1368CE]">{results.totalPlayers}</p>
+          <p className="text-xs sm:text-sm font-bold text-gray-500 uppercase">Players</p>
+          <p className="text-2xl sm:text-3xl font-black text-[#1368CE]">{results.totalPlayers}</p>
         </div>
-        <div className="bg-white rounded-2xl p-5 text-center shadow-lg">
+        <div className="bg-white rounded-2xl p-3 sm:p-5 text-center shadow-lg">
           <div className="flex items-center justify-center mb-2">
-            <CheckCircle className="h-6 w-6 text-[#26890C]" />
+            <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-[#26890C]" />
           </div>
-          <p className="text-sm font-bold text-gray-500 uppercase">Correct</p>
-          <p className="text-3xl font-black text-[#26890C]">
+          <p className="text-xs sm:text-sm font-bold text-gray-500 uppercase">Correct</p>
+          <p className="text-2xl sm:text-3xl font-black text-[#26890C]">
             {results.leaderboard.reduce((acc, p) => acc + p.correctAnswers, 0)}
           </p>
         </div>
-        <div className="bg-white rounded-2xl p-5 text-center shadow-lg">
+        <div className="bg-white rounded-2xl p-3 sm:p-5 text-center shadow-lg">
           <div className="flex items-center justify-center mb-2">
-            <Trophy className="h-6 w-6 text-[#FFC900]" />
+            <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-[#FFC900]" />
           </div>
-          <p className="text-sm font-bold text-gray-500 uppercase">Accuracy</p>
-          <p className="text-3xl font-black text-[#864CBF]">{accuracy.toFixed(0)}%</p>
+          <p className="text-xs sm:text-sm font-bold text-gray-500 uppercase">Accuracy</p>
+          <p className="text-2xl sm:text-3xl font-black text-[#864CBF]">{accuracy.toFixed(0)}%</p>
         </div>
       </div>
 
       {/* Leaderboard */}
-      <div className="bg-white rounded-3xl shadow-xl p-6">
-        <h3 className="text-xl font-black text-gray-800 mb-4 flex items-center gap-2">
+      <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6">
+        <h3 className="text-lg sm:text-xl font-black text-gray-800 mb-4 flex items-center gap-2">
           <span>🏅</span> Leaderboard
         </h3>
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {results.leaderboard.map((player, index) => {
             const allCorrect = player.correctAnswers === results.totalQuestions;
             return (
               <div
                 key={player.playerId}
-                className={`flex items-center justify-between p-4 rounded-2xl transition-all ${
+                className={`flex items-center justify-between p-3 sm:p-4 rounded-2xl transition-all ${
                   index === 0
                     ? "bg-gradient-to-r from-[#FFC900]/20 to-[#FFC900]/10 border-2 border-[#FFC900]/50"
                     : "bg-gray-50 border-2 border-transparent"
                 }`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                   {/* Rank */}
                   <div 
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ${
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-black text-sm sm:text-lg flex-shrink-0 ${
                       index === 0 
                         ? "bg-[#FFC900] text-white" 
                         : index === 1 
@@ -132,8 +132,8 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
                     {index + 1}
                   </div>
                   {/* Name + status */}
-                  <div>
-                    <span className="font-bold text-gray-800">{player.name}</span>
+                  <div className="min-w-0">
+                    <span className="font-bold text-gray-800 truncate block">{player.name}</span>
                     <div className="flex items-center gap-1 mt-0.5">
                       {allCorrect ? (
                         <span className="text-xs font-bold text-[#26890C] flex items-center gap-1">
@@ -147,8 +147,8 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-2xl font-black text-[#864CBF]">{player.score}</span>
+                <div className="text-right flex-shrink-0 ml-2">
+                  <span className="text-xl sm:text-2xl font-black text-[#864CBF]">{player.score}</span>
                   <span className="text-xs font-bold text-gray-400 block">pts</span>
                 </div>
               </div>
@@ -160,10 +160,10 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
       {/* Actions */}
       <div className="text-center space-y-4 pb-4">
         <p className="text-white/80 font-medium">Want to play again?</p>
-        <div className="flex justify-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
           <a
             href="/create"
-            className="inline-flex items-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
+            className="inline-flex items-center justify-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
             style={{
               background: "linear-gradient(135deg, #864CBF 0%, #46178F 100%)",
               boxShadow: "0 4px 15px rgba(70, 23, 143, 0.4)",
@@ -173,7 +173,7 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
           </a>
           <a
             href="/"
-            className="inline-flex items-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
+            className="inline-flex items-center justify-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
             style={{
               background: "linear-gradient(135deg, #1368CE 0%, #0D47A1 100%)",
               boxShadow: "0 4px 15px rgba(19, 104, 206, 0.4)",
