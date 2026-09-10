@@ -10,7 +10,6 @@ export async function POST(request: NextRequest) {
 
     const data: JoinGameData = await request.json();
 
-    // Validar campos requeridos
     if (!data.gameId || !data.playerName) {
       return NextResponse.json(
         { error: "Game ID and player name are required" },
@@ -18,13 +17,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar el juego en MongoDB
-    const game = await Game.findById(data.gameId);
+    const game = await Game.findOne({ gameCode: data.gameId });
     if (!game) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
 
-    // Verificar que el juego esté en estado "waiting"
     if (game.status !== "waiting") {
       return NextResponse.json(
         { error: "Game is no longer accepting players" },
@@ -32,7 +29,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar que el nombre de jugador no esté repetido
     const existingPlayer = (game.players as Player[]).find(
       (p) => p.name.toLowerCase() === data.playerName.toLowerCase()
     );
@@ -43,23 +39,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Crear el jugador
     const newPlayer: Player = {
       id: uuidv4(),
       name: data.playerName,
-      gameId: game._id.toString(),
+      gameId: game.gameCode,
       answers: {},
       score: 0,
       joinedAt: new Date(),
     };
 
-    // Agregar jugador al juego
     game.players.push(newPlayer);
     await game.save();
 
-    // Mapear _id a id para frontend
     const gameForFrontend = {
-      id: game._id.toString(),
+      id: game.gameCode,
       name: game.name,
       questions: game.questions,
       creatorId: game.creatorId,

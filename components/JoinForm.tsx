@@ -63,10 +63,15 @@ export function JoinForm() {
           <input
             id="gameId"
             type="text"
-            placeholder="Enter game code..."
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="000000"
             value={formData.gameId}
-            onChange={(e) => setFormData({ ...formData, gameId: e.target.value.trim() })}
-            className="w-full pl-14 pr-4 py-4 text-xl font-bold text-center uppercase tracking-widest border-3 border-gray-200 rounded-2xl focus:border-[#864CBF] focus:ring-4 focus:ring-[#864CBF]/20 transition-all outline-none"
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+              setFormData({ ...formData, gameId: val });
+            }}
+            className="w-full pl-14 pr-4 py-4 text-3xl font-black text-center tracking-[0.3em] border-3 border-gray-200 rounded-2xl focus:border-[#864CBF] focus:ring-4 focus:ring-[#864CBF]/20 transition-all outline-none"
             style={{ borderWidth: "3px" }}
             required
           />

@@ -3,6 +3,8 @@ import connectToDB from "@/lib/mongoose";
 import { Game } from "@/models/Game";
 import type { CreateGameData } from "@/types";
 import { v4 as uuidv4 } from "uuid";
+import { getUniqueGameCode } from "@/lib/gameCode";
+import { DEFAULT_TIME_LIMIT_MS } from "@/constants/game";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +12,6 @@ export async function POST(request: NextRequest) {
 
     const data: CreateGameData = await request.json();
 
-    // Validación básica
     if (!data.name || !data.questions || data.questions.length === 0) {
       return NextResponse.json(
         { error: "Missing required fields" },
@@ -18,7 +19,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validar cada pregunta
     for (const q of data.questions) {
       if (!q.text || !q.options || q.options.length !== 4) {
         return NextResponse.json(
@@ -40,19 +40,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generar creatorId temporal (en app real vendría de auth)
     const creatorId = uuidv4();
+    const gameCode = await getUniqueGameCode();
+    const questionTimeLimit = data.questionTimeLimit || DEFAULT_TIME_LIMIT_MS;
 
-    // Crear el juego en MongoDB
     const gameDoc = await Game.create({
       name: data.name,
+      gameCode,
       questions: data.questions,
       creatorId,
+      questionTimeLimit,
     });
 
-    // Mapear _id a id para frontend
     const game = {
-      id: gameDoc._id.toString(),
+      id: gameDoc.gameCode,
       name: gameDoc.name,
       questions: gameDoc.questions,
       creatorId: gameDoc.creatorId,
@@ -76,9 +77,8 @@ export async function GET() {
     await connectToDB();
     const gamesDocs = await Game.find().sort({ createdAt: -1 });
 
-    // Mapear _id a id para todos los juegos
     const games = gamesDocs.map((g) => ({
-      id: g._id.toString(),
+      id: g.gameCode,
       name: g.name,
       questions: g.questions,
       creatorId: g.creatorId,

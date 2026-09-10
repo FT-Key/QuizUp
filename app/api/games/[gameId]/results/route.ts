@@ -14,7 +14,7 @@ export async function GET(req: Request, { params }: Params) {
 
     await connectToDB();
 
-    const gameDoc = await Game.findById(gameId);
+    const gameDoc = await Game.findOne({ gameCode: gameId });
     if (!gameDoc || gameDoc.status !== "finished") {
       return NextResponse.json(
         { error: "Game not found or no results available" },
@@ -23,7 +23,6 @@ export async function GET(req: Request, { params }: Params) {
     }
 
     const players: Player[] = (gameDoc.players || []).map((p: any) => {
-      // Handle Mongoose Map or plain object for answers
       let answers: Record<string, number> = {};
       if (p.answers instanceof Map) {
         for (const [k, v] of p.answers) answers[k] = v;
@@ -33,7 +32,7 @@ export async function GET(req: Request, { params }: Params) {
       return {
         id: p.id,
         name: p.name,
-        gameId,
+        gameId: gameDoc.gameCode,
         answers,
         score: p.score || 0,
         joinedAt: p.joinedAt,
@@ -48,7 +47,7 @@ export async function GET(req: Request, { params }: Params) {
     }));
 
     const results: GameResults = {
-      gameId: gameDoc._id.toString(),
+      gameId: gameDoc.gameCode,
       createdAt: gameDoc.createdAt,
       totalPlayers: players.length,
       totalQuestions: questions.length,

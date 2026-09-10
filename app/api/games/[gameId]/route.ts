@@ -14,14 +14,13 @@ export async function GET(req: Request, { params }: Params) {
 
     await connectToDB();
 
-    const gameDoc = await Game.findById(gameId);
+    const gameDoc = await Game.findOne({ gameCode: gameId });
     if (!gameDoc) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
 
-    // Mapear _id a id y players a Player[]
     const game = {
-      id: gameDoc._id.toString(),
+      id: gameDoc.gameCode,
       name: gameDoc.name,
       questions: (gameDoc.questions || []).map(
         (q: any): Question => ({
@@ -41,7 +40,7 @@ export async function GET(req: Request, { params }: Params) {
         (p: any): Player => ({
           id: p.id,
           name: p.name,
-          gameId: gameId,
+          gameId: gameDoc.gameCode,
           answers: p.answers || {},
           score: p.score || 0,
           joinedAt: p.joinedAt,

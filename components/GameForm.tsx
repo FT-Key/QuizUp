@@ -23,6 +23,7 @@ export function GameForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [gameName, setGameName] = useState("")
+  const [questionTimeLimit, setQuestionTimeLimit] = useState(20000)
   const [questions, setQuestions] = useState<QuestionForm[]>([
     {
       text: "",
@@ -85,6 +86,7 @@ export function GameForm() {
     try {
       const formData: CreateGameData = {
         name: gameName,
+        questionTimeLimit,
         questions: questions,
       }
 
@@ -134,6 +136,38 @@ export function GameForm() {
           style={{ borderWidth: "3px" }}
           required
         />
+      </div>
+
+      {/* Time per Question */}
+      <div className="space-y-2">
+        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">
+          Time per Question
+        </label>
+        <div className="flex bg-gray-100 rounded-2xl p-1">
+          {[20000, 30000, 40000].map((time, i) => {
+            const isSelected = questionTimeLimit === time;
+            return (
+              <button
+                key={time}
+                type="button"
+                onClick={() => setQuestionTimeLimit(time)}
+                className={`flex-1 py-3 text-base font-bold transition-all ${
+                  isSelected
+                    ? "bg-white text-[#46178F] shadow-md"
+                    : "text-gray-500 hover:text-gray-700"
+                } ${
+                  i === 0
+                    ? "rounded-l-xl"
+                    : i === 2
+                    ? "rounded-r-xl"
+                    : ""
+                }`}
+              >
+                {time / 1000}s
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Questions */}

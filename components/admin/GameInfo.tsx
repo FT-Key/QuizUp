@@ -44,9 +44,11 @@ export const GameInfo = ({ game, timeLeft, questionEnded }: Props) => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
-          <span>Game ID:</span>
+          <span>Game Code:</span>
           <div className="flex items-center gap-2">
-            <code>{game.id}</code>
+            <code className="text-2xl font-black tracking-[0.2em] text-[#46178F]">
+              {game.id}
+            </code>
             <Button size="sm" variant="outline" onClick={handleCopyId}>
               {copied ? (
                 <Check className="h-4 w-4 text-green-500" />

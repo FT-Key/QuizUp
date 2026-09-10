@@ -36,6 +36,7 @@ export interface GameState {
 
 export interface CreateGameData {
   name: string;
+  questionTimeLimit?: number;
   questions: Array<{
     text: string;
     options: [string, string, string, string];

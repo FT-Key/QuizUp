@@ -15,7 +15,7 @@ export async function POST(req: Request, { params }: Params) {
 
     await connectToDB();
 
-    const gameDoc = await Game.findById(gameId);
+    const gameDoc = await Game.findOne({ gameCode: gameId });
     if (!gameDoc) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
@@ -34,7 +34,6 @@ export async function POST(req: Request, { params }: Params) {
       );
     }
 
-    // Iniciar juego
     gameDoc.status = "active";
     gameDoc.currentQuestionIndex = 0;
     gameDoc.currentQuestionStartTime = Date.now();
@@ -43,9 +42,8 @@ export async function POST(req: Request, { params }: Params) {
 
     await gameDoc.save();
 
-    // Retornar estado completo del juego tipado
     const game: GameType = {
-      id: gameDoc._id.toString(),
+      id: gameDoc.gameCode,
       name: gameDoc.name,
       questions: (gameDoc.questions || []).map((q: any) => ({
         id: q._id?.toString() || "",
@@ -62,7 +60,7 @@ export async function POST(req: Request, { params }: Params) {
       players: (gameDoc.players || []).map((p: any) => ({
         id: p.id,
         name: p.name,
-        gameId,
+        gameId: gameDoc.gameCode,
         answers: p.answers || {},
         score: p.score || 0,
         joinedAt: p.joinedAt,

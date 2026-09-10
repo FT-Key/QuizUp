@@ -13,7 +13,7 @@ export async function POST(req: Request, { params }: Params) {
 
     await connectToDB();
 
-    const game = await Game.findById(gameId);
+    const game = await Game.findOne({ gameCode: gameId });
     if (!game) {
       return NextResponse.json({ error: "Game not found" }, { status: 404 });
     }
@@ -25,9 +25,7 @@ export async function POST(req: Request, { params }: Params) {
       );
     }
 
-    // Marcar el juego como terminado
     game.status = "finished";
-    // Asegurarse que currentQuestionIndex esté al final
     game.currentQuestionIndex = game.questions.length - 1;
 
     await game.save();

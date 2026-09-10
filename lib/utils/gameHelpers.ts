@@ -110,14 +110,12 @@ export function getPlayerProgress(game: Game): {
  * Formatea el ID del juego para display.
  */
 export function formatGameId(gameId: string): string {
-  return gameId.toUpperCase();
+  return gameId;
 }
 
 /**
- * Valida que un gameId sea un UUID válido.
+ * Valida que un gameId sea un código de 6 dígitos.
  */
 export function isValidGameId(gameId: string): boolean {
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(gameId);
+  return /^\d{6}$/.test(gameId);
 }
