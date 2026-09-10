@@ -1,39 +1,48 @@
-import { GameForm } from "@/components/GameForm"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+"use client"
+
+import { JoinForm } from "@/components/JoinForm"
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl space-y-8">
-        {/* Header */}
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8" style={{ animation: "slide-up 0.6s ease-out" }}>
+        {/* Logo */}
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">QuizUp!</h1>
-          <p className="text-lg text-gray-600 dark:text-gray-300">
-            Create interactive quizzes and play with friends in real-time
+          <div className="inline-block">
+            <h1 
+              className="text-6xl font-black text-white tracking-tight"
+              style={{ 
+                textShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                animation: "bounce-in 0.8s ease-out"
+              }}
+            >
+              QuizUp!
+            </h1>
+          </div>
+          <p className="text-xl text-white/90 font-medium">
+            Enter a game code and play with friends!
           </p>
         </div>
 
-        {/* Game Creation Form */}
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Create New Quiz</CardTitle>
-            <CardDescription className="text-center">
-              Set up your quiz question and let others join to play
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <GameForm />
-          </CardContent>
-        </Card>
+        {/* Join Form Card */}
+        <div 
+          className="bg-white rounded-3xl shadow-2xl p-8"
+          style={{ animation: "bounce-in 0.9s ease-out" }}
+        >
+          <JoinForm />
+        </div>
 
-        {/* Join Game Link */}
+        {/* Create Quiz Link */}
         <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-300 mb-2">Already have a game ID?</p>
           <a
-            href="/join"
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
+            href="/create"
+            className="inline-flex items-center px-6 py-3 text-base font-semibold text-white rounded-full transition-all hover:scale-105"
+            style={{ 
+              background: "linear-gradient(135deg, #864CBF 0%, #46178F 100%)",
+              boxShadow: "0 4px 15px rgba(70, 23, 143, 0.4)"
+            }}
           >
-            Join Existing Game
+            Create a Quiz
           </a>
         </div>
       </div>

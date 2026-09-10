@@ -22,14 +22,23 @@ export async function GET(req: Request, { params }: Params) {
       );
     }
 
-    const players: Player[] = (gameDoc.players || []).map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      gameId,
-      answers: p.answers || {},
-      score: p.score || 0,
-      joinedAt: p.joinedAt,
-    }));
+    const players: Player[] = (gameDoc.players || []).map((p: any) => {
+      // Handle Mongoose Map or plain object for answers
+      let answers: Record<string, number> = {};
+      if (p.answers instanceof Map) {
+        for (const [k, v] of p.answers) answers[k] = v;
+      } else if (p.answers && typeof p.answers === "object") {
+        answers = { ...p.answers };
+      }
+      return {
+        id: p.id,
+        name: p.name,
+        gameId,
+        answers,
+        score: p.score || 0,
+        joinedAt: p.joinedAt,
+      };
+    });
 
     const questions: Question[] = (gameDoc.questions || []).map((q: any) => ({
       id: q._id?.toString() || q.id || "",

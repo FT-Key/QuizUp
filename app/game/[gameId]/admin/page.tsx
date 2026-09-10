@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { GameInfo } from "@/components/admin/GameInfo";
 import { GameControls } from "@/components/admin/GameControls";
@@ -11,26 +11,48 @@ import { useAdminSocket } from "@/hooks/useAdminSocket";
 import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 
 export default function AdminPage() {
-  // ---- Validación de gameId ----
-  const { gameId: rawGameId } = useParams();
-  if (!rawGameId || Array.isArray(rawGameId)) {
-    throw new Error("Invalid gameId in URL");
-  }
-  const gameId = rawGameId; // ahora es seguro como string
-
-  // ---- Hook de socket ----
-  const { game, setGame, emit, loading, questionEnded } = useAdminSocket(gameId);
+  const { gameId } = useParams();
+  const { game, setGame, emit, loading, results } = useAdminSocket(gameId as string);
 
   const [isStarting, setIsStarting] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  const currentQuestion = game?.questions[game?.currentQuestionIndex ?? 0];
+  // Debug: log game state changes
+  useEffect(() => {
+    if (game) {
+      console.log("[AdminPage] game state changed:", {
+        status: game.status,
+        currentQuestionIndex: game.currentQuestionIndex,
+        players: game.players.map((p) => ({
+          name: p.name,
+          id: p.id,
+          answers: p.answers,
+          score: p.score,
+        })),
+      });
+      if (game.players.length > 0) {
+        const q = game.questions[game.currentQuestionIndex];
+        console.log("[AdminPage] currentQuestion:", q?.id, "correctAnswer:", q?.correctAnswer);
+        for (const p of game.players) {
+          console.log(`[AdminPage] player ${p.name} answer for q ${q?.id}:`, p.answers?.[q?.id]);
+        }
+      }
+    }
+  }, [game]);
 
-  const { timeLeft } = useQuestionTimer(
+  useEffect(() => {
+    if (results) {
+      console.log("[AdminPage] results:", JSON.stringify(results, null, 2));
+    }
+  }, [results]);
+
+  const { timeLeft, isFinished } = useQuestionTimer(
     game?.currentQuestionStartTime ?? 0,
-    game?.questionTimeLimit ?? 30000,
-    currentQuestion?.id
+    game?.questionTimeLimit ?? 30000
   );
+
+  const questionEnded = game?.status !== "active" || isFinished;
+  const currentQuestion = game?.questions[game?.currentQuestionIndex];
 
   // ---- Handlers ----
   const handleStartGame = async () => {
@@ -38,7 +60,8 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/games/${gameId}/start`, { method: "POST" });
       if (!res.ok) throw new Error("Failed to start game");
-      // No usamos data.game aquí — el timer se sincroniza via game-started del WS
+      const data = await res.json();
+      setGame(data.game);
       emit("start-game", { gameId });
     } catch (err) {
       console.error(err);
@@ -51,11 +74,6 @@ export default function AdminPage() {
   const handleFinishGame = async () => {
     setIsFinishing(true);
     try {
-      const res = await fetch(`/api/games/${gameId}/finish`, {
-        method: "POST",
-      });
-      if (!res.ok) throw new Error("Failed to finish game");
-      setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
       emit("finish-game", { gameId });
     } catch (err) {
       console.error(err);
@@ -67,15 +85,30 @@ export default function AdminPage() {
 
   const handleNextQuestion = () => {
     emit("next-question", { gameId });
-    // El estado se actualiza via question-changed o game-finished del servidor
+    setGame((prev) =>
+      prev
+        ? {
+            ...prev,
+            currentQuestionIndex: prev.currentQuestionIndex + 1,
+            currentQuestionStartTime: Date.now(),
+          }
+        : prev
+    );
   };
 
   const handleForceEnd = () => {
     emit("finish-question", { gameId });
-    // El estado se actualiza via question-finished del servidor
+    setGame((prev) =>
+      prev
+        ? {
+            ...prev,
+            currentQuestionStartTime:
+              Date.now() - (prev.questionTimeLimit || 30000),
+          }
+        : prev
+    );
   };
 
-  // ---- Loading ----
   if (loading || !game) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -121,9 +154,9 @@ export default function AdminPage() {
           />
         )}
 
-        <PlayerList players={game.players} gameStatus={game.status} />
+        <PlayerList players={game.players} gameStatus={game.status} currentQuestion={currentQuestion} />
 
-        {game.status === "finished" && <Results gameId={gameId} />}
+        {game.status === "finished" && <Results gameId={gameId as string} results={results} />}
       </div>
     </div>
   );

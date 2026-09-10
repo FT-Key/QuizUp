@@ -1,65 +1,102 @@
 "use client"
 
+import { useState, useCallback } from "react"
 import type { Question } from "@/types"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
+const KAHOOT_COLORS = [
+  { bg: "#E21B3C", hover: "#C41834", name: "Red", icon: "▲" },
+  { bg: "#1368CE", hover: "#105AB0", name: "Blue", icon: "◆" },
+  { bg: "#26890C", hover: "#1E7209", name: "Green", icon: "●" },
+  { bg: "#FFC900", hover: "#E0B200", name: "Yellow", icon: "■" },
+]
 
 interface QuestionCardProps {
   question: Question
   onAnswerSubmit: (answerIndex: number) => void
-  disabled?: boolean
-  timeLeft?: number
-  timeLimit?: number
 }
 
-export function QuestionCard({ question, onAnswerSubmit, disabled = false, timeLeft, timeLimit }: QuestionCardProps) {
-  const progressPct = timeLeft !== undefined && timeLimit ? Math.max(0, (timeLeft / timeLimit) * 100) : undefined
-  const timeLeftSec = timeLeft !== undefined ? Math.ceil(timeLeft / 1000) : undefined
+export function QuestionCard({ question, onAnswerSubmit }: QuestionCardProps) {
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSelect = useCallback(async (index: number) => {
+    if (selectedAnswer !== null || isSubmitting) return
+    
+    setSelectedAnswer(index)
+    setIsSubmitting(true)
+    
+    try {
+      await onAnswerSubmit(index)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [selectedAnswer, isSubmitting, onAnswerSubmit])
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xl">Question</CardTitle>
-          {timeLeftSec !== undefined && (
-            <span className={`text-2xl font-bold tabular-nums ${timeLeftSec <= 5 ? "text-red-500" : "text-gray-700 dark:text-gray-200"}`}>
-              {timeLeftSec}s
-            </span>
-          )}
-        </div>
-        {progressPct !== undefined && (
-          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mt-2">
-            <div
-              className={`h-full rounded-full transition-all duration-100 ${progressPct <= 20 ? "bg-red-500" : "bg-blue-500"}`}
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <p className="text-lg font-medium text-gray-900 dark:text-white">{question.text}</p>
-        </div>
+    <div className="space-y-6">
+      {/* Question Text */}
+      <div 
+        className="bg-white rounded-3xl shadow-xl p-8 text-center"
+        style={{ animation: "bounce-in 0.5s ease-out" }}
+      >
+        <p className="text-2xl md:text-3xl font-black text-gray-800 leading-tight">
+          {question.text}
+        </p>
+      </div>
 
-        <div className="space-y-3">
-          {question.options.map((option, index) => (
-            <button
-              key={index}
-              disabled={disabled}
-              onClick={() => onAnswerSubmit(index)}
-              className={`w-full text-left p-4 rounded-lg border-2 transition-colors flex items-center space-x-3
-                ${disabled
-                  ? "opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700"
-                  : "cursor-pointer border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 active:scale-[0.99]"
-                }`}
-            >
-              <span className="flex-shrink-0 w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center text-sm font-medium">
-                {String.fromCharCode(65 + index)}
-              </span>
-              <span className="text-base">{option}</span>
-            </button>
-          ))}
+      {/* Answer Options Grid - 2x2 */}
+      <div className="grid grid-cols-2 gap-4">
+        {question.options.map((option, index) => (
+          <button
+            key={index}
+            onClick={() => handleSelect(index)}
+            disabled={selectedAnswer !== null}
+            className={`
+              relative rounded-3xl p-6 min-h-[140px] flex flex-col items-center justify-center text-center
+              transition-all duration-200 
+              ${selectedAnswer === index 
+                ? "scale-95 ring-4 ring-white shadow-2xl" 
+                : selectedAnswer !== null 
+                  ? "opacity-50 scale-95" 
+                  : "hover:scale-[1.03] hover:shadow-xl active:scale-95"
+              }
+              ${isSubmitting && selectedAnswer === index ? "animate-pulse" : ""}
+            `}
+            style={{
+              backgroundColor: KAHOOT_COLORS[index].bg,
+              animation: selectedAnswer === null ? `bounce-in ${0.3 + index * 0.1}s ease-out` : "none",
+            }}
+          >
+            {/* Shape Icon */}
+            <span className="text-5xl md:text-6xl text-white/90 mb-2">
+              {KAHOOT_COLORS[index].icon}
+            </span>
+            
+            {/* Option Text */}
+            <span className="text-lg md:text-xl font-bold text-white leading-tight">
+              {option}
+            </span>
+
+            {/* Selection Indicator */}
+            {selectedAnswer === index && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-3xl">
+                <div className="bg-white rounded-full p-4">
+                  <svg className="h-10 w-10 text-[#26890C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Loading State */}
+      {isSubmitting && (
+        <div className="text-center text-white font-bold text-lg">
+          Sending your answer...
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   )
 }

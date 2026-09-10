@@ -21,7 +21,7 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable}`}
       style={{ fontFamily: GeistSans.style.fontFamily }}
     >
-      <body className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <body className="min-h-screen" style={{ background: 'linear-gradient(135deg, #46178F 0%, #7B2FBE 25%, #1368CE 50%, #26890C 75%, #FFC900 100%)' }}>
         <div className="min-h-screen">{children}</div>
       </body>
     </html>

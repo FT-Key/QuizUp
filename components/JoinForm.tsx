@@ -1,13 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Loader2, Users } from "lucide-react"
+import { Loader2, Gamepad2, User } from "lucide-react"
 import type { JoinGameData } from "@/types"
 
 export function JoinForm() {
@@ -39,11 +35,9 @@ export function JoinForm() {
         throw new Error(data.error || "Failed to join game")
       }
 
-      // Store player info in localStorage for the game session
       localStorage.setItem("playerId", data.player.id)
       localStorage.setItem("playerName", data.player.name)
 
-      // Redirect to game page
       router.push(`/game/${formData.gameId}`)
     } catch (error) {
       console.error("Error joining game:", error)
@@ -57,31 +51,45 @@ export function JoinForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Game ID */}
+      {/* Game ID Input */}
       <div className="space-y-2">
-        <Label htmlFor="gameId">Game ID</Label>
-        <Input
-          id="gameId"
-          type="text"
-          placeholder="Enter the game ID..."
-          value={formData.gameId}
-          onChange={(e) => setFormData({ ...formData, gameId: e.target.value.trim() })}
-          required
-        />
+        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">
+          Game Code
+        </label>
+        <div className="relative">
+          <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+            <Gamepad2 className="h-6 w-6 text-[#864CBF]" />
+          </div>
+          <input
+            id="gameId"
+            type="text"
+            placeholder="Enter game code..."
+            value={formData.gameId}
+            onChange={(e) => setFormData({ ...formData, gameId: e.target.value.trim() })}
+            className="w-full pl-14 pr-4 py-4 text-xl font-bold text-center uppercase tracking-widest border-3 border-gray-200 rounded-2xl focus:border-[#864CBF] focus:ring-4 focus:ring-[#864CBF]/20 transition-all outline-none"
+            style={{ borderWidth: "3px" }}
+            required
+          />
+        </div>
       </div>
 
-      {/* Player Name */}
+      {/* Player Name Input */}
       <div className="space-y-2">
-        <Label htmlFor="playerName">Your Name</Label>
+        <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">
+          Your Name
+        </label>
         <div className="relative">
-          <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
+          <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+            <User className="h-6 w-6 text-[#1368CE]" />
+          </div>
+          <input
             id="playerName"
             type="text"
             placeholder="Enter your name..."
             value={formData.playerName}
             onChange={(e) => setFormData({ ...formData, playerName: e.target.value })}
-            className="pl-10"
+            className="w-full pl-14 pr-4 py-4 text-lg font-medium border-3 border-gray-200 rounded-2xl focus:border-[#1368CE] focus:ring-4 focus:ring-[#1368CE]/20 transition-all outline-none"
+            style={{ borderWidth: "3px" }}
             required
           />
         </div>
@@ -89,22 +97,34 @@ export function JoinForm() {
 
       {/* Error Message */}
       {error && (
-        <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
+        <div className="p-4 text-sm font-medium text-white bg-[#E21B3C] rounded-2xl text-center">
           {error}
         </div>
       )}
 
       {/* Submit Button */}
-      <Button type="submit" className="w-full" disabled={!isFormValid || isLoading}>
+      <button
+        type="submit"
+        disabled={!isFormValid || isLoading}
+        className="w-full py-5 text-xl font-black text-white rounded-2xl transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        style={{
+          background: isFormValid 
+            ? "linear-gradient(135deg, #26890C 0%, #1E7D0A 100%)" 
+            : "linear-gradient(135deg, #A0A0A0 0%, #808080 100%)",
+          boxShadow: isFormValid 
+            ? "0 6px 20px rgba(38, 137, 12, 0.4)" 
+            : "none"
+        }}
+      >
         {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Joining Game...
-          </>
+          <span className="flex items-center justify-center gap-3">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            Joining...
+          </span>
         ) : (
-          "Join Game"
+          "JOIN GAME"
         )}
-      </Button>
+      </button>
     </form>
   )
 }
