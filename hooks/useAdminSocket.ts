@@ -39,7 +39,30 @@ export const useAdminSocket = (gameId: string) => {
             console.log("[useAdminSocket] game-updated, players:", updatedGame.players.map((p) => ({
               name: p.name, id: p.id, answers: p.answers, score: p.score,
             })));
-            setGame(updatedGame);
+            setGame((prev) => ({
+              ...updatedGame,
+              // Preserve currentQuestionStartTime when server sets it to 0 (question finished)
+              // so the timer doesn't reset to full time before question-finished arrives
+              currentQuestionStartTime:
+                updatedGame.currentQuestionStartTime === 0 && prev
+                  ? prev.currentQuestionStartTime
+                  : updatedGame.currentQuestionStartTime,
+            }));
+          },
+        },
+        {
+          event: "question-finished",
+          callback: (data: { currentQuestionIndex: number }) => {
+            console.log("[useAdminSocket] question-finished, index:", data.currentQuestionIndex);
+            setGame((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    currentQuestionStartTime:
+                      Date.now() - (prev.questionTimeLimit || 30000),
+                  }
+                : prev
+            );
           },
         },
         {
