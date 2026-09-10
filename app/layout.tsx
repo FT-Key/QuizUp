@@ -25,11 +25,16 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable}`}
       style={{ fontFamily: GeistSans.style.fontFamily }}
     >
-      <body 
-        className="min-h-screen bg-fixed bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/background-quizup.png')" }}
-      >
-        <div className="min-h-screen">{children}</div>
+      <body className="min-h-screen">
+        <div 
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ 
+            backgroundImage: "url('/background-quizup.png')",
+            filter: "blur(2px)",
+            transform: "scale(1.05)"
+          }}
+        />
+        <div className="relative min-h-screen">{children}</div>
       </body>
     </html>
   );
