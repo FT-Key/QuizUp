@@ -1,43 +1,37 @@
 import { type NextRequest, NextResponse } from "next/server";
 import connectToDB from "@/lib/mongoose";
 import { Game } from "@/models/Game";
-import type { CreateGameData } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { getUniqueGameCode } from "@/lib/gameCode";
 import { DEFAULT_TIME_LIMIT_MS } from "@/constants/game";
+import { sanitizeQuizData, QuizFileError } from "@/lib/quizFile";
 
 export async function POST(request: NextRequest) {
   try {
     await connectToDB();
 
-    const data: CreateGameData = await request.json();
-
-    if (!data.name || !data.questions || data.questions.length === 0) {
+    const raw = await request.json().catch(() => null);
+    if (!raw) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Invalid JSON body" },
         { status: 400 }
       );
     }
 
-    for (const q of data.questions) {
-      if (!q.text || !q.options || q.options.length !== 4) {
-        return NextResponse.json(
-          { error: "Each question must have text and exactly 4 options" },
-          { status: 400 }
-        );
-      }
-      if (q.options.some((o) => !o.trim())) {
-        return NextResponse.json(
-          { error: "All answer options must be provided" },
-          { status: 400 }
-        );
-      }
-      if (q.correctAnswer < 0 || q.correctAnswer > 3) {
-        return NextResponse.json(
-          { error: "Invalid correct answer index" },
-          { status: 400 }
-        );
-      }
+    let data;
+    try {
+      data = sanitizeQuizData(raw);
+    } catch (error) {
+      const message =
+        error instanceof QuizFileError ? error.message : "Invalid game data";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    if (!data.name) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
     const creatorId = uuidv4();

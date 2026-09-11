@@ -28,6 +28,7 @@ export async function GET(req: Request, { params }: Params) {
           text: q.text,
           options: q.options,
           correctAnswer: q.correctAnswer,
+          image: q.image ?? null,
         })
       ),
       creatorId: gameDoc.creatorId,
@@ -35,6 +36,7 @@ export async function GET(req: Request, { params }: Params) {
       currentQuestionIndex: gameDoc.currentQuestionIndex,
       currentQuestionStartTime: gameDoc.currentQuestionStartTime || 0,
       questionTimeLimit: gameDoc.questionTimeLimit || DEFAULT_TIME_LIMIT_MS,
+      locked: gameDoc.locked || false,
       createdAt: gameDoc.createdAt,
       players: (gameDoc.players || []).map(
         (p: any): Player => ({
@@ -44,6 +46,7 @@ export async function GET(req: Request, { params }: Params) {
           answers: p.answers || {},
           score: p.score || 0,
           joinedAt: p.joinedAt,
+          avatar: p.avatar || undefined,
         })
       ),
     };

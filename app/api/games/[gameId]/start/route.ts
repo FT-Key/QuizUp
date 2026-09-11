@@ -1,4 +1,4 @@
-// app/api/games/[gameId]/start/route.ts
+
 import { NextResponse } from "next/server";
 import connectToDB from "@/lib/mongoose";
 import { Game } from "@/models/Game";
@@ -50,6 +50,7 @@ export async function POST(req: Request, { params }: Params) {
         text: q.text,
         options: q.options,
         correctAnswer: q.correctAnswer,
+        image: q.image ?? null,
       })),
       creatorId: gameDoc.creatorId,
       status: gameDoc.status,
@@ -64,6 +65,7 @@ export async function POST(req: Request, { params }: Params) {
         answers: p.answers || {},
         score: p.score || 0,
         joinedAt: p.joinedAt,
+        avatar: p.avatar || undefined,
       })),
     };
 

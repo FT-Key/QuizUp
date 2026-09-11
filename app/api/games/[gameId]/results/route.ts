@@ -1,4 +1,4 @@
-// app/api/games/[gameId]/results/route.ts
+
 import { NextResponse } from "next/server";
 import connectToDB from "@/lib/mongoose";
 import { Game } from "@/models/Game";
@@ -36,6 +36,7 @@ export async function GET(req: Request, { params }: Params) {
         answers,
         score: p.score || 0,
         joinedAt: p.joinedAt,
+        avatar: p.avatar || undefined,
       };
     });
 
@@ -44,6 +45,7 @@ export async function GET(req: Request, { params }: Params) {
       text: q.text,
       options: q.options,
       correctAnswer: q.correctAnswer,
+      image: q.image ?? null,
     }));
 
     const results: GameResults = {
@@ -66,6 +68,7 @@ export async function GET(req: Request, { params }: Params) {
             questions.length > 0
               ? Math.round((correctAnswers / questions.length) * 100)
               : 0,
+          avatar: p.avatar || undefined,
         };
       }),
       questionResults: questions.map((q) => ({

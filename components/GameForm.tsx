@@ -1,10 +1,18 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, Trash2, Check } from "lucide-react"
-import type { CreateGameData } from "@/types"
+import { Loader2, Plus, Trash2, Check, FolderOpen, Download, Upload, ChevronDown } from "lucide-react"
+import { ImagePicker } from "./ImagePicker"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
+import type { CreateGameData, QuestionImage } from "@/types"
+import { parseQuizUpFile, QuizFileError, QUIZ_FILE_LIMITS } from "@/lib/quizFile"
 
 const KAHOOT_COLORS = [
   { bg: "#E21B3C", hover: "#C41834", name: "Red", icon: "▲" },
@@ -17,30 +25,26 @@ interface QuestionForm {
   text: string
   options: [string, string, string, string]
   correctAnswer: number
+  image?: QuestionImage | null
 }
+
+const emptyQuestion = (): QuestionForm => ({
+  text: "",
+  options: ["", "", "", ""],
+  correctAnswer: 0,
+  image: null,
+})
 
 export function GameForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [gameName, setGameName] = useState("")
   const [questionTimeLimit, setQuestionTimeLimit] = useState(20000)
-  const [questions, setQuestions] = useState<QuestionForm[]>([
-    {
-      text: "",
-      options: ["", "", "", ""],
-      correctAnswer: 0,
-    },
-  ])
+  const [questions, setQuestions] = useState<QuestionForm[]>([emptyQuestion()])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const addQuestion = () => {
-    setQuestions([
-      ...questions,
-      {
-        text: "",
-        options: ["", "", "", ""],
-        correctAnswer: 0,
-      },
-    ])
+    setQuestions([...questions, emptyQuestion()])
   }
 
   const removeQuestion = (index: number) => {
@@ -79,6 +83,71 @@ export function GameForm() {
     setQuestions(newQuestions)
   }
 
+  const handleExport = () => {
+    const payload = {
+      format: "quizup",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      name: gameName || "Quiz sin nombre",
+      questionTimeLimit,
+      questions: questions.map((q) => ({
+        text: q.text,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        ...(q.image?.url ? { image: q.image } : {}),
+      })),
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${(gameName || "quiz").replace(/[^a-z0-9-_]+/gi, "_")}.quizup`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+
+    if (file.size > QUIZ_FILE_LIMITS.maxFileBytes) {
+      alert("El archivo es demasiado grande. El máximo permitido es 2 MB.")
+      return
+    }
+
+    try {
+      const text = await file.text()
+      const imported = parseQuizUpFile(text)
+
+      setQuestions(
+        imported.questions.map((q) => ({
+          text: q.text,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          image: q.image,
+        }))
+      )
+      if (imported.name) setGameName(imported.name)
+      if (imported.questionTimeLimit) {
+        setQuestionTimeLimit(imported.questionTimeLimit)
+      }
+    } catch (error) {
+      if (error instanceof QuizFileError) {
+        alert(`Archivo .quizup inválido:\n${error.message}`)
+      } else {
+        alert(
+          "No se pudo leer el archivo. Asegúrate de que sea un archivo .quizup exportado desde QuizUp."
+        )
+      }
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -103,10 +172,10 @@ export function GameForm() {
       }
 
       const { game } = await response.json()
-      console.log("Game response: ", game)
+
       router.push(`/game/${game.id}/admin`)
     } catch (error) {
-      console.error("Error creating game:", error)
+
       alert("Failed to create game. Please try again.")
     } finally {
       setIsLoading(false)
@@ -121,7 +190,7 @@ export function GameForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Game Name */}
+
       <div className="space-y-2">
         <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">
           Quiz Name
@@ -132,13 +201,13 @@ export function GameForm() {
           placeholder="Enter your quiz name..."
           value={gameName}
           onChange={(e) => setGameName(e.target.value)}
+          maxLength={QUIZ_FILE_LIMITS.maxNameLength}
           className="w-full px-4 py-4 text-lg font-medium border-3 border-gray-200 rounded-2xl focus:border-[#864CBF] focus:ring-4 focus:ring-[#864CBF]/20 transition-all outline-none"
           style={{ borderWidth: "3px" }}
           required
         />
       </div>
 
-      {/* Time per Question */}
       <div className="space-y-2">
         <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">
           Time per Question
@@ -170,23 +239,62 @@ export function GameForm() {
         </div>
       </div>
 
-      {/* Questions */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-xl font-black text-gray-800 uppercase">
             Questions ({questions.length})
           </h2>
-          <button
-            type="button"
-            onClick={addQuestion}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-xl transition-all hover:scale-105"
-            style={{
-              background: "linear-gradient(135deg, #864CBF 0%, #46178F 100%)",
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            Add Question
-          </button>
+          <div className="flex items-center gap-2">
+
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-700 bg-white border-2 border-gray-200 rounded-xl transition-colors hover:border-[#864CBF] hover:text-[#864CBF]"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  Archivo
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onClick={() => fileInputRef.current?.click()}
+                  className="cursor-pointer font-medium"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importar (.quizup)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleExport}
+                  className="cursor-pointer font-medium"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar (.quizup)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".quizup,.json,application/json"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+
+            <button
+              type="button"
+              onClick={addQuestion}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-xl transition-all hover:scale-105"
+              style={{
+                background: "linear-gradient(135deg, #864CBF 0%, #46178F 100%)",
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Add Question
+            </button>
+          </div>
         </div>
 
         {questions.map((question, questionIndex) => (
@@ -194,10 +302,10 @@ export function GameForm() {
             key={questionIndex}
             className="bg-gray-50 rounded-3xl p-6 space-y-5 border-2 border-gray-100"
           >
-            {/* Question Header */}
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div 
+                <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-lg"
                   style={{
                     background: KAHOOT_COLORS[questionIndex % 4].bg
@@ -218,7 +326,6 @@ export function GameForm() {
               )}
             </div>
 
-            {/* Question Text */}
             <textarea
               placeholder="Type your question here..."
               value={question.text}
@@ -226,16 +333,21 @@ export function GameForm() {
                 updateQuestion(questionIndex, "text", e.target.value)
               }
               rows={2}
+              maxLength={QUIZ_FILE_LIMITS.maxQuestionTextLength}
               className="w-full px-4 py-3 text-base font-medium border-2 border-gray-200 rounded-2xl focus:border-[#1368CE] focus:ring-4 focus:ring-[#1368CE]/20 transition-all outline-none resize-none"
               required
             />
 
-            {/* Answer Options Grid - 2x2 with Kahoot Colors */}
+            <ImagePicker
+              image={question.image}
+              onChange={(img) => updateQuestion(questionIndex, "image", img)}
+            />
+
             <div className="space-y-3">
               <label className="block text-sm font-bold text-gray-700 uppercase tracking-wide">
                 Answer Options
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {question.options.map((option, optionIndex) => (
                   <div
                     key={optionIndex}
@@ -244,7 +356,7 @@ export function GameForm() {
                       backgroundColor: KAHOOT_COLORS[optionIndex].bg,
                     }}
                   >
-                    {/* Correct Answer Toggle */}
+
                     <button
                       type="button"
                       onClick={() =>
@@ -260,12 +372,10 @@ export function GameForm() {
                       <Check className="h-5 w-5" />
                     </button>
 
-                    {/* Shape Icon */}
                     <div className="text-4xl text-white/90 pt-3 pl-3">
                       {KAHOOT_COLORS[optionIndex].icon}
                     </div>
 
-                    {/* Option Input */}
                     <div className="p-3 pt-1">
                       <input
                         type="text"
@@ -274,6 +384,7 @@ export function GameForm() {
                         onChange={(e) =>
                           updateOption(questionIndex, optionIndex, e.target.value)
                         }
+                        maxLength={QUIZ_FILE_LIMITS.maxOptionLength}
                         className="w-full px-3 py-2 text-base font-bold text-white placeholder-white/60 bg-black/20 rounded-xl border-2 border-white/30 focus:border-white focus:ring-2 focus:ring-white/50 transition-all outline-none"
                         required
                       />
@@ -283,9 +394,8 @@ export function GameForm() {
               </div>
             </div>
 
-            {/* Correct Answer Indicator */}
             <div className="flex items-center gap-2 text-sm text-gray-600">
-              <div 
+              <div
                 className="w-4 h-4 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: KAHOOT_COLORS[question.correctAnswer].bg }}
               >
@@ -302,7 +412,6 @@ export function GameForm() {
         ))}
       </div>
 
-      {/* Submit Button */}
       <button
         type="submit"
         className="w-full py-5 text-xl font-black text-white rounded-2xl transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
