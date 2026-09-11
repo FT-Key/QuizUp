@@ -99,13 +99,24 @@ export function AudioPlayer() {
     []
   );
 
+  useEffect(() => {
+    if (!expanded) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-volume-control]')) {
+        setExpanded(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [expanded]);
+
   if (!mounted) return null;
 
   return (
     <div
+      data-volume-control
       className="fixed bottom-5 right-5 z-50 flex flex-col-reverse items-center gap-2"
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
     >
       <button
         onClick={toggleMute}

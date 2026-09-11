@@ -13,6 +13,9 @@ export const metadata: Metadata = {
     icon: "/minilogo-quizup.png",
     apple: "/minilogo-quizup.png",
   },
+  other: {
+    "google": "notranslate",
+  },
 };
 
 export default function RootLayout({
@@ -23,16 +26,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      translate="no"
+      className={`${GeistSans.variable} ${GeistMono.variable} notranslate`}
       style={{ fontFamily: GeistSans.style.fontFamily }}
     >
-      <body className="min-h-screen">
-        <div 
-          className="fixed inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ 
+      <body className="min-h-screen overflow-x-hidden">
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
+          style={{
             backgroundImage: "url('/background-quizup.png')",
-            filter: "blur(2px)",
-            transform: "scale(1.05)"
+            filter: "blur(2px)"
           }}
         />
         <div className="relative min-h-screen">{children}</div>
