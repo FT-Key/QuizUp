@@ -17,6 +17,7 @@ export default defineConfig({
             "core/**/*.test.ts",
             "adapters/**/*.test.ts",
             "lib/**/*.test.ts",
+            "tests/**/*.test.ts",
           ],
         },
       },
