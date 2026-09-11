@@ -18,8 +18,8 @@ const FALLBACK_URI = "mongodb://localhost:27017/quizapp";
 type ConnectToDB = () => Promise<unknown>;
 
 async function importConnectToDB(): Promise<ConnectToDB> {
-  const module = await import("@/lib/mongoose");
-  return module.default as ConnectToDB;
+  const mongooseModule = await import("@/lib/mongoose");
+  return mongooseModule.default as ConnectToDB;
 }
 
 function clearGlobalCache(): void {

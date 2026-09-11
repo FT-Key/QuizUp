@@ -5,7 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
-    "lint": "next lint",
+    "lint": "next lint --dir app components lib core adapters infra",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
