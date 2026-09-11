@@ -63,6 +63,7 @@ export interface CreateGameData {
 
 export interface JoinGameData {
   gameId: string;
+  playerId?: string;
   playerName: string;
   avatar?: PlayerAvatar;
 }
@@ -88,7 +89,7 @@ export interface GameResults {
     percentage: number;
     avatar?: PlayerAvatar;
   }>;
-  questionResults: Array<{
+  questionResults?: Array<{
     questionId: string;
     questionText: string;
     correctAnswer: number;
@@ -132,6 +133,10 @@ export interface SocketEvents {
     timeLeft: number;
   }) => void;
 
+  /**
+   * @deprecated Evento sin emisor (muerto). Se elimina en US-15.
+   * El evento vigente es `question-changed`.
+   */
   "question-updated": (data: {
     question: Question;
     questionIndex: number;
@@ -162,4 +167,6 @@ export interface SocketEvents {
     currentQuestionIndex: number;
     timeLeft: number;
   }) => void;
+
+  "update-dashboard": (data: Game[]) => void;
 }

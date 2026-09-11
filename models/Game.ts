@@ -41,7 +41,7 @@ const gameSchema = new Schema({
   creatorId: { type: String, required: true },
   status: {
     type: String,
-    enum: ["waiting", "active", "finished"],
+    enum: ["waiting", "active", "finished", "cancelled"],
     default: "waiting",
   },
   currentQuestionIndex: { type: Number, default: 0 },
