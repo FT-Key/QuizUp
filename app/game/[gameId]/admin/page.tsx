@@ -1,50 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
-import { GameInfo } from "@/components/admin/GameInfo";
-import { GameControls } from "@/components/admin/GameControls";
-import { QuestionPreview } from "@/components/admin/QuestionPreview";
-import { PlayerList } from "@/components/PlayerList";
+import Link from "next/link";
 import { Results } from "@/components/Results";
+import { AdminLobby } from "@/components/admin/AdminLobby";
+import { AdminPresentation } from "@/components/admin/AdminPresentation";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 
 export default function AdminPage() {
   const { gameId } = useParams();
-  const { game, setGame, emit, loading, results } = useAdminSocket(gameId as string);
+  const { game, setGame, emit, loading, results } = useAdminSocket(
+    gameId as string
+  );
 
   const [isStarting, setIsStarting] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
-
-  // Debug: log game state changes
-  useEffect(() => {
-    if (game) {
-      console.log("[AdminPage] game state changed:", {
-        status: game.status,
-        currentQuestionIndex: game.currentQuestionIndex,
-        players: game.players.map((p) => ({
-          name: p.name,
-          id: p.id,
-          answers: p.answers,
-          score: p.score,
-        })),
-      });
-      if (game.players.length > 0) {
-        const q = game.questions[game.currentQuestionIndex];
-        console.log("[AdminPage] currentQuestion:", q?.id, "correctAnswer:", q?.correctAnswer);
-        for (const p of game.players) {
-          console.log(`[AdminPage] player ${p.name} answer for q ${q?.id}:`, p.answers?.[q?.id]);
-        }
-      }
-    }
-  }, [game]);
-
-  useEffect(() => {
-    if (results) {
-      console.log("[AdminPage] results:", JSON.stringify(results, null, 2));
-    }
-  }, [results]);
 
   const { timeLeft, isFinished } = useQuestionTimer(
     game?.currentQuestionStartTime ?? 0,
@@ -52,9 +24,8 @@ export default function AdminPage() {
   );
 
   const questionEnded = game?.status !== "active" || isFinished;
-  const currentQuestion = game?.questions[game?.currentQuestionIndex];
 
-  // ---- Handlers ----
+  
   const handleStartGame = async () => {
     setIsStarting(true);
     try {
@@ -64,7 +35,7 @@ export default function AdminPage() {
       setGame(data.game);
       emit("start-game", { gameId });
     } catch (err) {
-      console.error(err);
+      
       alert("Failed to start game.");
     } finally {
       setIsStarting(false);
@@ -76,7 +47,7 @@ export default function AdminPage() {
     try {
       emit("finish-game", { gameId });
     } catch (err) {
-      console.error(err);
+      
       alert("Failed to finish game.");
     } finally {
       setIsFinishing(false);
@@ -109,54 +80,108 @@ export default function AdminPage() {
     );
   };
 
+  const handleKick = (playerId: string) => {
+    emit("leave-game", { gameId, playerId });
+  };
+
+  const handleToggleLock = () => {
+    if (!game) return;
+    emit("lock-game", { gameId, locked: !game.locked });
+  };
+
+  const handleCloseGame = () => {
+    emit("close-game", { gameId });
+    setGame((prev) => (prev ? { ...prev, status: "cancelled" } : prev));
+  };
+
   if (loading || !game) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>Loading admin view...</p>
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-lg font-bold text-gray-600">
+            Cargando vista de admin...
+          </p>
+          <p className="text-sm text-gray-400">
+            Si tarda mucho, intenta recargar la página
+          </p>
+        </div>
       </div>
     );
   }
 
-  const playersWithAnswers = currentQuestion
-    ? game.players.filter((p) => p.answers?.[currentQuestion.id] !== undefined)
-        .length
-    : 0;
+  
+  if (game.status === "cancelled") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8 text-center space-y-4">
+          <div className="text-6xl">🚪</div>
+          <h2 className="text-2xl font-black text-gray-800">
+            Partida cerrada
+          </h2>
+          <p className="text-gray-600">
+            Esta partida nunca se inició y fue cerrada por el anfitrión o por
+            inactividad.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+            <Link
+              href="/create"
+              className="inline-flex items-center justify-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
+              style={{
+                background: "linear-gradient(135deg, #864CBF 0%, #46178F 100%)",
+              }}
+            >
+              Crear otro quiz
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
+              style={{
+                background: "linear-gradient(135deg, #1368CE 0%, #0D47A1 100%)",
+              }}
+            >
+              Volver al inicio
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
+  
+  if (game.status === "waiting") {
+    return (
+      <AdminLobby
+        game={game}
+        isStarting={isStarting}
+        onStart={handleStartGame}
+        onKick={handleKick}
+        onToggleLock={handleToggleLock}
+        onClose={handleCloseGame}
+      />
+    );
+  }
+
+  
+  if (game.status === "active") {
+    return (
+      <AdminPresentation
+        game={game}
+        timeLeft={timeLeft}
+        questionEnded={questionEnded}
+        isFinishing={isFinishing}
+        onForceEnd={handleForceEnd}
+        onNextQuestion={handleNextQuestion}
+        onFinish={handleFinishGame}
+      />
+    );
+  }
+
+  
   return (
     <div className="min-h-screen p-4">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <GameInfo
-          game={game}
-          timeLeft={timeLeft}
-          questionEnded={questionEnded}
-        />
-
-        <GameControls
-          gameStatus={game.status}
-          currentQuestionIndex={game.currentQuestionIndex}
-          totalQuestions={game.questions.length}
-          isStarting={isStarting}
-          isFinishing={isFinishing}
-          questionEnded={questionEnded}
-          onStart={handleStartGame}
-          onFinish={handleFinishGame}
-          onNextQuestion={handleNextQuestion}
-          onForceEnd={handleForceEnd}
-          hasPlayers={game.players.length > 0}
-        />
-
-        {currentQuestion && (
-          <QuestionPreview
-            question={currentQuestion}
-            showAnswer={questionEnded}
-            playersWithAnswers={playersWithAnswers}
-            totalPlayers={game.players.length}
-          />
-        )}
-
-        <PlayerList players={game.players} gameStatus={game.status} currentQuestion={currentQuestion} />
-
-        {game.status === "finished" && <Results gameId={gameId as string} results={results} />}
+      <div className="max-w-4xl mx-auto">
+        <Results gameId={gameId as string} results={results} />
       </div>
     </div>
   );
