@@ -121,9 +121,16 @@
   body {
     @apply text-foreground;
   }
+
+  html {
+    translate: no;
+  }
+
+  .notranslate {
+    translate: no;
+  }
 }
 
-/* Kahoot Colors */
 :root {
   --kahoot-red: #E21B3C;
   --kahoot-blue: #1368CE;
@@ -175,4 +182,111 @@
     transform: scale(1);
     opacity: 1;
   }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes score-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes firework-burst {
+  0% {
+    transform: scale(0) translate(0, 0);
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translate(var(--tx), var(--ty));
+    opacity: 0;
+  }
+}
+
+@keyframes firework-particle {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--tx, 0px), var(--ty, 0px)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes avatar-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(12px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes podium-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s ease-out forwards;
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.5s ease-out forwards;
+}
+
+.animate-score-pop {
+  animation: score-pop 0.3s ease-out;
+}
+
+.animate-avatar-pop {
+  animation: avatar-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-podium-grow {
+  transform-origin: bottom;
+  animation: podium-grow 0.45s ease-out forwards;
 }

@@ -1,19 +1,15 @@
 import type { Game, GameResults } from "@/types";
 
-/**
- * Calcula los resultados de un juego según la nueva interfaz GameResults.
- */
 export function calculateGameResults(game: Game): GameResults {
   const totalPlayers = game.players.length;
   const totalQuestions = game.questions.length;
 
-  // Generar leaderboard
   const leaderboard = game.players.map((player) => {
     const correctAnswers = Object.values(player.answers).filter(
       (answer, index) => answer === game.questions[index]?.correctAnswer
     ).length;
 
-    const score = correctAnswers; // Puedes ajustar a otra fórmula si usas puntos distintos
+    const score = correctAnswers;
     const percentage =
       totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
 
@@ -24,10 +20,10 @@ export function calculateGameResults(game: Game): GameResults {
       correctAnswers,
       totalQuestions,
       percentage,
+      avatar: player.avatar,
     };
   });
 
-  // Generar resultados por pregunta
   const questionResults = game.questions.map((q) => ({
     questionId: q.id,
     questionText: q.text,
@@ -50,9 +46,6 @@ export function calculateGameResults(game: Game): GameResults {
   };
 }
 
-/**
- * Devuelve un texto amigable según el estado del juego.
- */
 export function getGameStatusDisplay(status: Game["status"]): string {
   switch (status) {
     case "waiting":
@@ -66,23 +59,14 @@ export function getGameStatusDisplay(status: Game["status"]): string {
   }
 }
 
-/**
- * Comprueba si se puede iniciar el juego.
- */
 export function canStartGame(game: Game): boolean {
   return game.status === "waiting" && game.players.length > 0;
 }
 
-/**
- * Comprueba si se puede finalizar el juego.
- */
 export function canFinishGame(game: Game): boolean {
   return game.status === "active";
 }
 
-/**
- * Comprueba si todos los jugadores respondieron.
- */
 export function getAllPlayersAnswered(game: Game): boolean {
   return (
     game.players.length > 0 &&
@@ -92,9 +76,6 @@ export function getAllPlayersAnswered(game: Game): boolean {
   );
 }
 
-/**
- * Devuelve progreso de respuestas de los jugadores.
- */
 export function getPlayerProgress(game: Game): {
   answered: number;
   total: number;
@@ -106,16 +87,32 @@ export function getPlayerProgress(game: Game): {
   return { answered, total };
 }
 
-/**
- * Formatea el ID del juego para display.
- */
 export function formatGameId(gameId: string): string {
   return gameId;
 }
 
-/**
- * Valida que un gameId sea un código de 6 dígitos.
- */
 export function isValidGameId(gameId: string): boolean {
   return /^\d{6}$/.test(gameId);
+}
+
+export function calculatePositionChanges(
+  currentPlayers: Array<{ playerId: string; score: number }>,
+  previousPlayers: Array<{ playerId: string; score: number }>
+): Map<string, { previous: number; current: number }> {
+  const result = new Map<string, { previous: number; current: number }>();
+
+  const currentSorted = [...currentPlayers].sort((a, b) => b.score - a.score);
+  const previousSorted = [...previousPlayers].sort((a, b) => b.score - a.score);
+
+  currentSorted.forEach((current, currentIndex) => {
+    const previousIndex = previousSorted.findIndex(
+      p => p.playerId === current.playerId
+    );
+    result.set(current.playerId, {
+      previous: previousIndex >= 0 ? previousIndex : currentIndex,
+      current: currentIndex,
+    });
+  });
+
+  return result;
 }
