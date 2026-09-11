@@ -1,8 +1,17 @@
+export interface QuestionImage {
+  url: string;
+  thumb?: string;
+  alt?: string;
+  author?: string;
+  authorLink?: string;
+}
+
 export interface Question {
   id: string;
   text: string;
-  options: [string, string, string, string]; // exactly 4 options
-  correctAnswer: number; // index 0-3
+  options: [string, string, string, string];
+  correctAnswer: number;
+  image?: QuestionImage | null;
 }
 
 export interface Game {
@@ -11,11 +20,17 @@ export interface Game {
   questions: Question[];
   createdAt: Date;
   creatorId: string;
-  status: "waiting" | "active" | "finished";
+  status: "waiting" | "active" | "finished" | "cancelled";
   currentQuestionIndex: number;
   players: Player[];
-  currentQuestionStartTime: number; // timestamp en ms
-  questionTimeLimit: number; // ms por pregunta
+  currentQuestionStartTime: number;
+  questionTimeLimit: number;
+  locked?: boolean;
+}
+
+export interface PlayerAvatar {
+  seed: string;
+  accessories?: string[];
 }
 
 export interface Player {
@@ -25,6 +40,7 @@ export interface Player {
   answers: { [questionId: string]: number };
   score: number;
   joinedAt: Date;
+  avatar?: PlayerAvatar;
 }
 
 export interface GameState {
@@ -41,12 +57,14 @@ export interface CreateGameData {
     text: string;
     options: [string, string, string, string];
     correctAnswer: number;
+    image?: QuestionImage | null;
   }>;
 }
 
 export interface JoinGameData {
   gameId: string;
   playerName: string;
+  avatar?: PlayerAvatar;
 }
 
 export interface SubmitAnswerData {
@@ -68,6 +86,7 @@ export interface GameResults {
     correctAnswers: number;
     totalQuestions: number;
     percentage: number;
+    avatar?: PlayerAvatar;
   }>;
   questionResults: Array<{
     questionId: string;
@@ -84,9 +103,7 @@ export interface GameResults {
 }
 
 export interface SocketEvents {
-  // -----------------
-  // Cliente -> Servidor
-  // -----------------
+
   "join-game": (data: JoinGameData) => void;
   "join-admin": (gameId: string) => void;
   "start-game": (data: { gameId: string }) => void;
@@ -95,18 +112,17 @@ export interface SocketEvents {
   "finish-game": (data: { gameId: string }) => void;
   "submit-answer": (data: SubmitAnswerData) => void;
   "leave-game": (data: { gameId: string; playerId: string }) => void;
+  "lock-game": (data: { gameId: string; locked: boolean }) => void;
+  "close-game": (data: { gameId: string }) => void;
   "request-dashboard": () => void;
   "request-game-state": (data: { gameId: string }) => void;
 
-  // -----------------
-  // Servidor -> Cliente
-  // -----------------
-  joined: (data: { player: Player; game: Game }) => void; // cuando un jugador se une
-  "player-joined": (data: { player: Player; game: Game }) => void; // alias que también puede usar backend
+  joined: (data: { player: Player; game: Game }) => void;
+  "player-joined": (data: { player: Player; game: Game }) => void;
   "player-left": (data: { playerId: string; game: Game }) => void;
   "game-updated": (data: { game: Game }) => void;
 
-  "join-error": (data: { message: string }) => void; // error al unirse
+  "join-error": (data: { message: string }) => void;
 
   "game-started": (data: {
     game: Game;
@@ -137,6 +153,8 @@ export interface SocketEvents {
   }) => void;
 
   "game-finished": (data: { game: Game; results: any }) => void;
+
+  "game-cancelled": (data: { game: Game }) => void;
 
   "game-state": (data: {
     game: Game;
