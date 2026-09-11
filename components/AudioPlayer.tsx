@@ -149,8 +149,7 @@ export function AudioPlayer() {
           style={{
             writingMode: "vertical-lr",
             direction: "rtl",
-            WebkitAppearance: "slider-vertical",
-            appearance: "slider-vertical",
+            WebkitAppearance: "slider-vertical"
           }}
         />
       </div>
