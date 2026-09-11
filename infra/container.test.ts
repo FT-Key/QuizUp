@@ -22,9 +22,22 @@ vi.mock("@/infra/config", () => ({
   loadConfig: loadConfigSpy,
 }));
 
-vi.mock("mongoose", () => ({
-  default: { connect: connectSpy },
-}));
+// US-11: el grafo ahora importa `game.schema.ts`, que llama a `new Schema(...)`,
+// `.index(...)` y `models.Game || model("Game", ...)` al cargarse. El mock debe
+// exponer esas APIs sin conectar a Mongo.
+vi.mock("mongoose", () => {
+  class Schema {
+    index() {
+      return this;
+    }
+  }
+  return {
+    default: { connect: connectSpy },
+    Schema,
+    model: vi.fn(() => ({})),
+    models: {},
+  };
+});
 
 const CONFIG: AppConfig = {
   mongoUri: "mongodb://localhost:27017/quizapp",
@@ -51,6 +64,36 @@ describe("infra/container", () => {
     expect(first.logger).not.toBe(second.logger);
     expect(first.clock).not.toBe(second.clock);
     expect(first.ids).not.toBe(second.ids);
+    // US-11: cada container cablea sus propias raíces de repo/generador/use cases.
+    expect(first.gameCodes).not.toBe(second.gameCodes);
+    expect(first.games).not.toBe(second.games);
+    expect(first.useCases).not.toBe(second.useCases);
+    expect(typeof first.games.findById).toBe("function");
+  });
+
+  it("el grafo expone gameCodes, el repo Mongo y los 7 casos de uso", () => {
+    const container = createContainer(CONFIG);
+
+    expect(typeof container.gameCodes.generate).toBe("function");
+    expect(typeof container.games.existsByCode).toBe("function");
+    expect(typeof container.games.findById).toBe("function");
+    expect(typeof container.games.listRecent).toBe("function");
+    expect(typeof container.games.create).toBe("function");
+    expect(typeof container.games.addPlayer).toBe("function");
+    expect(typeof container.games.setStatusAndIndex).toBe("function");
+
+    expect(Object.keys(container.useCases).sort()).toEqual([
+      "createGame",
+      "finishGame",
+      "getGame",
+      "getResults",
+      "joinGame",
+      "listGames",
+      "startGame",
+    ]);
+    for (const useCase of Object.values(container.useCases)) {
+      expect(typeof useCase.execute).toBe("function");
+    }
   });
 
   it("clock respeta el reloj fake e ids genera un UUID v4", () => {
