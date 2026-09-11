@@ -34,16 +34,27 @@ export const useSocket = ({
   useEffect(() => {
     const handleConnect = () => {
       setConnected(true);
-      // Re-join room on reconnect
+
       if (isAdmin) {
-        console.log("Re-joining game as ADMIN:", { gameId });
+
         socket.emit("join-admin", gameId);
       } else {
         const name = playerName || localStorage.getItem("playerName");
         const savedPlayerId = localStorage.getItem("playerId");
+        const savedAvatarSeed = localStorage.getItem("playerAvatarSeed");
+        let savedAccessories: string[] = [];
+        try {
+          const raw = localStorage.getItem("playerAvatarAccessories");
+          if (raw) savedAccessories = JSON.parse(raw);
+        } catch {}
         if (name) {
-          console.log("Re-joining game as PLAYER:", { gameId, name, savedPlayerId });
-          socket.emit("join-game", { gameId, playerId: savedPlayerId, playerName: name });
+
+          socket.emit("join-game", {
+            gameId,
+            playerId: savedPlayerId,
+            playerName: name,
+            avatar: { seed: savedAvatarSeed || name, accessories: savedAccessories },
+          });
         }
       }
     };
@@ -52,6 +63,10 @@ export const useSocket = ({
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
 
+    if (socket.connected) {
+      handleConnect();
+    }
+
     return () => {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
@@ -59,11 +74,11 @@ export const useSocket = ({
   }, [gameId, isAdmin]);
 
   useEffect(() => {
-    // registrar listeners personalizados
+
     events.forEach(({ event, callback }) => socket.on(event, callback));
     return () => {
       events.forEach(({ event, callback }) => socket.off(event, callback));
-      console.log("Socket event listeners cleaned up");
+
     };
   }, [events]);
 

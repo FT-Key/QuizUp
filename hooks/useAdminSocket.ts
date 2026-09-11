@@ -4,12 +4,16 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "./useSocket";
 import type { Game, Player, Question, GameResults } from "@/types";
 
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 3000;
+
 export const useAdminSocket = (gameId: string) => {
   const [game, setGame] = useState<Game | null>(null);
   const [results, setResults] = useState<GameResults | null>(null);
   const [loading, setLoading] = useState(true);
+  const [retryTick, setRetryTick] = useState(0);
 
-  const hasRequestedState = useRef(false);
+  const triedHttpFallback = useRef(false);
 
   const { socket, emit, connected } = useSocket({
     gameId,
@@ -20,40 +24,53 @@ export const useAdminSocket = (gameId: string) => {
           event: "player-joined",
           callback: ({
             player,
-            game: updatedGame,
           }: {
             player: Player;
             game: Game;
           }) => {
-            console.log("[useAdminSocket] player-joined ->", player);
 
-            // 🔹 Solo log y toast opcional
-            // Si querés, podés agregar un toast aquí:
-            // toast(`${player.name} se unió al juego!`);
+          },
+        },
+        {
+          event: "player-left",
+          callback: ({
+            playerId,
+            game: updatedGame,
+          }: {
+            playerId: string;
+            game: Game;
+          }) => {
+
+            if (updatedGame) {
+              setGame(updatedGame);
+            } else {
+              setGame((prev) =>
+                prev
+                  ? { ...prev, players: prev.players.filter((p) => p.id !== playerId) }
+                  : prev
+              );
+            }
           },
         },
         {
           event: "game-updated",
           callback: ({ game: updatedGame }: { game: Game }) => {
-            console.log("[useAdminSocket] game-updated, status:", updatedGame.status);
-            console.log("[useAdminSocket] game-updated, players:", updatedGame.players.map((p) => ({
-              name: p.name, id: p.id, answers: p.answers, score: p.score,
-            })));
+
             setGame((prev) => ({
               ...updatedGame,
-              // Preserve currentQuestionStartTime when server sets it to 0 (question finished)
-              // so the timer doesn't reset to full time before question-finished arrives
               currentQuestionStartTime:
                 updatedGame.currentQuestionStartTime === 0 && prev
                   ? prev.currentQuestionStartTime
                   : updatedGame.currentQuestionStartTime,
             }));
+
+            setLoading(false);
           },
         },
         {
           event: "question-finished",
           callback: (data: { currentQuestionIndex: number }) => {
-            console.log("[useAdminSocket] question-finished, index:", data.currentQuestionIndex);
+
             setGame((prev) =>
               prev
                 ? {
@@ -68,8 +85,7 @@ export const useAdminSocket = (gameId: string) => {
         {
           event: "game-finished",
           callback: (data: { game: Game; results: GameResults }) => {
-            console.log("[useAdminSocket] game-finished, game:", data.game);
-            console.log("[useAdminSocket] game-finished, results:", data.results);
+
             if (data.game) {
               setGame(data.game);
             } else {
@@ -78,6 +94,21 @@ export const useAdminSocket = (gameId: string) => {
             if (data.results) {
               setResults(data.results);
             }
+            setLoading(false);
+          },
+        },
+        {
+          event: "game-cancelled",
+          callback: (data: { game: Game }) => {
+
+            if (data.game) {
+              setGame(data.game);
+            } else {
+              setGame((prev) =>
+                prev ? { ...prev, status: "cancelled" } : prev
+              );
+            }
+            setLoading(false);
           },
         },
         {
@@ -88,17 +119,14 @@ export const useAdminSocket = (gameId: string) => {
             currentQuestionIndex: number;
             timeLeft: number;
           }) => {
-            console.log("[useAdminSocket] game-state received:", data);
 
             const { game: incomingGame, currentQuestionIndex, timeLeft } = data;
-
             setGame({
               ...incomingGame,
               currentQuestionIndex,
               currentQuestionStartTime:
-                Date.now() - (incomingGame.questionTimeLimit - timeLeft),
+                Date.now() - ((incomingGame.questionTimeLimit || 30000) - timeLeft),
             });
-
             setLoading(false);
           },
         },
@@ -107,13 +135,60 @@ export const useAdminSocket = (gameId: string) => {
     ),
   });
 
-  useEffect(() => {
-    if (!socket || !gameId || !connected || hasRequestedState.current) return;
+  const fetchGameViaHttp = async () => {
+    try {
 
-    console.log("[useAdminSocket] emitting request-game-state", { gameId });
+      const res = await fetch(`/api/games/${gameId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.game) {
+          setGame(data.game);
+          setLoading(false);
+        }
+      }
+    } catch (err) {
+
+    }
+  };
+
+  useEffect(() => {
+    if (!socket || !gameId || !connected) return;
+
     socket.emit("request-game-state", { gameId });
-    hasRequestedState.current = true;
   }, [socket, gameId, connected]);
+
+  useEffect(() => {
+    if (!loading) return;
+
+    if (retryTick >= MAX_RETRIES) {
+      if (!triedHttpFallback.current) {
+        triedHttpFallback.current = true;
+        fetchGameViaHttp();
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setRetryTick((t) => t + 1);
+    }, RETRY_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [loading, retryTick]);
+
+  useEffect(() => {
+    if (retryTick === 0 || !loading) return;
+    if (retryTick <= MAX_RETRIES && socket && connected) {
+
+      socket.emit("request-game-state", { gameId });
+    }
+  }, [retryTick, socket, connected, gameId, loading]);
+
+  useEffect(() => {
+    if (!connected) return;
+    if (loading && socket) {
+      socket.emit("request-game-state", { gameId });
+    }
+  }, [connected]);
 
   return { game, setGame, emit, loading, results };
 };

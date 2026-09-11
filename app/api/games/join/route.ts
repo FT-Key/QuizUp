@@ -29,6 +29,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (game.locked) {
+      return NextResponse.json(
+        { error: "Game entry is locked" },
+        { status: 403 }
+      );
+    }
+
     const existingPlayer = (game.players as Player[]).find(
       (p) => p.name.toLowerCase() === data.playerName.toLowerCase()
     );
@@ -46,6 +53,7 @@ export async function POST(request: NextRequest) {
       answers: {},
       score: 0,
       joinedAt: new Date(),
+      avatar: data.avatar || { seed: data.playerName },
     };
 
     game.players.push(newPlayer);
@@ -66,6 +74,7 @@ export async function POST(request: NextRequest) {
         answers: p.answers,
         score: p.score,
         joinedAt: p.joinedAt,
+        avatar: p.avatar,
       })),
     };
 

@@ -2,11 +2,17 @@
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { QuestionCard } from "@/components/QuestionCard";
 import { Results } from "@/components/Results";
+import { Avatar } from "@/components/Avatar";
+import { AvatarSelector } from "@/components/AvatarSelector";
+import { Scoreboard } from "@/components/Scoreboard";
 import { Loader2, Users, Clock } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
-import type { Game, Player, GameResults, Question } from "@/types";
+import type { Game, Player, GameResults, Question, PlayerAvatar } from "@/types";
+
+type GamePhase = 'waiting' | 'question' | 'showing-result' | 'showing-scoreboard';
 
 export default function GamePage() {
   const params = useParams();
@@ -24,7 +30,57 @@ export default function GamePage() {
     score: number;
   } | null>(null);
 
+  
+  const [gamePhase, setGamePhase] = useState<GamePhase>('waiting');
+  const [playerAvatarSeed, setPlayerAvatarSeed] = useState<string>("");
+  const [playerAccessories, setPlayerAccessories] = useState<string[]>([]);
+  const [previousLeaderboard, setPreviousLeaderboard] = useState<Array<{playerId: string; score: number}>>([]);
+
   const prevQuestionIndexRef = useRef<number | null>(null);
+
+  
+  
+  const syncPhaseFromGame = (g: Game, me: Player | null | undefined) => {
+    if (g.status !== "active") return;
+
+    const q = g.questions[g.currentQuestionIndex];
+    if (!q) return;
+
+    const answered = me?.answers?.[q.id] !== undefined;
+    const allAnswered =
+      g.players.length > 0 &&
+      g.players.every((p) => p.answers?.[q.id] !== undefined);
+    const timeExpired =
+      g.currentQuestionStartTime === 0 ||
+      (g.currentQuestionStartTime > 0 &&
+        Date.now() >=
+          g.currentQuestionStartTime + (g.questionTimeLimit || 30000));
+    const questionFinished = allAnswered || timeExpired;
+
+    setHasSubmitted(answered);
+    setIsQuestionFinished(questionFinished);
+
+    if (answered && me) {
+      setPlayerAnswerResult({
+        correct: me.answers[q.id] === q.correctAnswer,
+        score: me.score || 0,
+      });
+    } else {
+      setPlayerAnswerResult(null);
+    }
+
+    setGamePhase(questionFinished ? "showing-result" : "question");
+  };
+
+  
+  useEffect(() => {
+    if (gamePhase === 'showing-result') {
+      const timer = setTimeout(() => {
+        setGamePhase('showing-scoreboard');
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [gamePhase]);
 
   useEffect(() => {
     const fetchGame = async () => {
@@ -36,6 +92,15 @@ export default function GamePage() {
 
         const playerId = localStorage.getItem("playerId");
         const playerName = localStorage.getItem("playerName");
+        const avatarSeed = localStorage.getItem("playerAvatarSeed");
+        const accessoriesStr = localStorage.getItem("playerAvatarAccessories");
+        if (avatarSeed) setPlayerAvatarSeed(avatarSeed);
+        if (accessoriesStr) {
+          try {
+            setPlayerAccessories(JSON.parse(accessoriesStr));
+          } catch {}
+        }
+
         if (playerId && playerName) {
           const foundPlayer = data.game.players.find(
             (p: Player) => p.id === playerId
@@ -43,7 +108,14 @@ export default function GamePage() {
           if (foundPlayer) {
             if (!foundPlayer.answers) foundPlayer.answers = {};
             setPlayer(foundPlayer);
-            emit("join-game", { gameId, playerId });
+            emit("join-game", {
+              gameId,
+              playerId,
+              avatar: {
+                seed: avatarSeed || playerName,
+                accessories: accessoriesStr ? JSON.parse(accessoriesStr).filter((a: string) => a !== 'none') : [],
+              },
+            });
 
             const currentQuestion =
               data.game.questions[data.game.currentQuestionIndex];
@@ -52,10 +124,12 @@ export default function GamePage() {
                 foundPlayer.answers?.[currentQuestion.id] !== undefined
               );
             }
+            
+            syncPhaseFromGame(data.game, foundPlayer);
           }
         }
       } catch (err) {
-        console.error("[GamePage] fetchGame error:", err);
+        
         setError("Failed to load game");
       } finally {
         setLoading(false);
@@ -73,11 +147,17 @@ export default function GamePage() {
         {
           event: "joined",
           callback: (data: { player: Player; game: Game }) => {
-            console.log("[GamePage] joined received:", data);
+            
             if (data.player) {
               localStorage.setItem("playerId", data.player.id);
               localStorage.setItem("playerName", data.player.name);
               setPlayer(data.player);
+              if (data.player.avatar?.seed) {
+                setPlayerAvatarSeed(data.player.avatar.seed);
+              }
+              if (data.player.avatar?.accessories) {
+                setPlayerAccessories(data.player.avatar.accessories);
+              }
             }
             if (data.game) {
               setGame(data.game);
@@ -90,6 +170,7 @@ export default function GamePage() {
                   )
                 );
               }
+              syncPhaseFromGame(data.game, data.player);
             }
             setLoading(false);
           },
@@ -101,11 +182,17 @@ export default function GamePage() {
             players: Player[];
             currentQuestion: Question;
           }) => {
-            console.log("[GamePage] game-started:", data);
+            
             setIsQuestionFinished(false);
             setHasSubmitted(false);
             setPlayerAnswerResult(null);
             setGame(data.game);
+            setGamePhase('question');
+
+            
+            const lb = data.game.players.map(p => ({ playerId: p.id, score: p.score }));
+            setPreviousLeaderboard(lb);
+
             const pid = localStorage.getItem("playerId");
             if (pid) {
               const found = data.game.players.find((p) => p.id === pid);
@@ -116,7 +203,7 @@ export default function GamePage() {
         {
           event: "game-updated",
           callback: (payload: { game: Game }) => {
-            console.log("[GamePage] game-updated:", payload.game);
+            
             const updatedGame = payload.game;
             setGame(updatedGame);
 
@@ -129,7 +216,7 @@ export default function GamePage() {
                   updatedGame.questions[updatedGame.currentQuestionIndex];
                 if (curQ) {
                   const hasAnswer = found.answers && found.answers[curQ.id] !== undefined;
-                  console.log(`[GamePage] game-updated: player ${found.name} answer for q ${curQ.id}: ${found.answers?.[curQ.id]}, hasAnswer: ${hasAnswer}`);
+                  
                   setHasSubmitted(Boolean(hasAnswer));
                 }
               }
@@ -140,7 +227,7 @@ export default function GamePage() {
               const allAnswered = updatedGame.players.every(
                 (p) => p.answers?.[curQ.id] !== undefined
               );
-              console.log(`[GamePage] game-updated: allAnswered=${allAnswered} for q ${curQ.id}`);
+              
               setIsQuestionFinished(allAnswered);
               if (allAnswered) {
                 const pid2 = localStorage.getItem("playerId");
@@ -148,7 +235,7 @@ export default function GamePage() {
                   const me = updatedGame.players.find((p) => p.id === pid2);
                   if (me) {
                     const playerAns = me.answers?.[curQ.id];
-                    console.log(`[GamePage] game-updated: my answer=${playerAns}, correctAnswer=${curQ.correctAnswer}`);
+                    
                     if (playerAns !== undefined) {
                       setPlayerAnswerResult({
                         correct: playerAns === curQ.correctAnswer,
@@ -166,8 +253,9 @@ export default function GamePage() {
         {
           event: "question-finished",
           callback: (data: any) => {
-            console.log("[GamePage] question-finished event:", data);
+            
             setIsQuestionFinished(true);
+            setGamePhase('showing-result');
             emitRef.current?.("request-game-state", { gameId });
           },
         },
@@ -179,25 +267,14 @@ export default function GamePage() {
             currentQuestionIndex: number;
             timeLeft: number;
           }) => {
-            console.log("[GamePage] game-state received:", payload);
+            
             setGame(payload.game);
             const pid = localStorage.getItem("playerId");
             if (pid) {
               const found = payload.game.players.find((p) => p.id === pid);
               if (found) {
                 setPlayer(found);
-                const curQ = payload.game.questions[payload.currentQuestionIndex];
-                if (curQ) {
-                  setHasSubmitted(
-                    Boolean(found.answers && found.answers[curQ.id] !== undefined)
-                  );
-                  if (found.answers?.[curQ.id] !== undefined) {
-                    setPlayerAnswerResult({
-                      correct: found.answers[curQ.id] === curQ.correctAnswer,
-                      score: found.score || 0,
-                    });
-                  }
-                }
+                syncPhaseFromGame(payload.game, found);
               }
             }
           },
@@ -205,14 +282,14 @@ export default function GamePage() {
         {
           event: "join-error",
           callback: (payload: any) => {
-            console.error("[GamePage] join-error:", payload);
+            
             alert(payload?.message || "Failed to join the game");
           },
         },
         {
           event: "game-finished",
           callback: (data: { game: Game; results: GameResults }) => {
-            console.log("[GamePage] game-finished:", data);
+            
             if (data.game) {
               setGame(data.game);
             } else {
@@ -224,12 +301,26 @@ export default function GamePage() {
           },
         },
         {
+          event: "game-cancelled",
+          callback: (data: { game: Game }) => {
+            
+            if (data.game) {
+              setGame(data.game);
+            } else {
+              setGame((prev) =>
+                prev ? { ...prev, status: "cancelled" } : prev
+              );
+            }
+          },
+        },
+        {
           event: "question-changed",
           callback: (data: { question: Question; questionIndex: number; timeLeft: number }) => {
-            console.log("[GamePage] question-changed:", data);
+            
             setIsQuestionFinished(false);
             setHasSubmitted(false);
             setPlayerAnswerResult(null);
+            setGamePhase('question');
             setGame((prev) => {
               if (!prev) return prev;
               return { ...prev, currentQuestionIndex: data.questionIndex };
@@ -249,16 +340,75 @@ export default function GamePage() {
     const [name, setName] = useState<string>(() => {
       return localStorage.getItem("playerName") || "";
     });
+    const [avatarSeed, setAvatarSeed] = useState<string>("");
+    const [avatarAccessories, setAvatarAccessories] = useState<string[]>([]);
+    const [joinStep, setJoinStep] = useState<'name' | 'avatar'>('name');
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleNameSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       const trimmed = name.trim();
-      if (!trimmed || !emit) return;
-      emit("join-game", { gameId, playerName: trimmed });
+      if (!trimmed) return;
+      setJoinStep('avatar');
     };
 
+    const handleJoin = () => {
+      if (!emit) return;
+      const trimmed = name.trim();
+      localStorage.setItem("playerName", trimmed);
+      if (avatarSeed) localStorage.setItem("playerAvatarSeed", avatarSeed);
+      if (avatarAccessories.length > 0) {
+        localStorage.setItem("playerAvatarAccessories", JSON.stringify(avatarAccessories));
+      }
+      emit("join-game", {
+        gameId,
+        playerName: trimmed,
+        avatar: {
+          seed: avatarSeed || trimmed,
+          accessories: avatarAccessories.filter(a => a !== 'none'),
+        },
+      });
+    };
+
+    if (joinStep === 'avatar') {
+      return (
+        <div className="space-y-4">
+          <AvatarSelector
+            playerName={name}
+            onSelect={(seed, accessories) => {
+              setAvatarSeed(seed);
+              if (accessories) setAvatarAccessories(accessories);
+            }}
+            initialSeed={avatarSeed || name}
+          />
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setJoinStep('name')}
+              className="px-6 py-4 text-lg font-bold text-white rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+              style={{
+                background: "linear-gradient(135deg, #666 0%, #444 100%)",
+              }}
+            >
+              Atrás
+            </button>
+            <button
+              type="button"
+              onClick={handleJoin}
+              className="flex-1 py-4 text-lg font-black text-white rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+              style={{
+                background: "linear-gradient(135deg, #1368CE 0%, #0D47A1 100%)",
+                boxShadow: "0 6px 20px rgba(19, 104, 206, 0.4)",
+              }}
+            >
+              JOIN GAME
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleNameSubmit} className="space-y-4">
         <label className="block text-sm font-bold text-white uppercase tracking-wide">
           Your Name
         </label>
@@ -271,13 +421,16 @@ export default function GamePage() {
         />
         <button
           type="submit"
-          className="w-full py-4 text-lg font-black text-white rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+          disabled={!name.trim()}
+          className="w-full py-4 text-lg font-black text-white rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
           style={{
-            background: "linear-gradient(135deg, #1368CE 0%, #0D47A1 100%)",
-            boxShadow: "0 6px 20px rgba(19, 104, 206, 0.4)",
+            background: name.trim()
+              ? "linear-gradient(135deg, #1368CE 0%, #0D47A1 100%)"
+              : "linear-gradient(135deg, #666 0%, #444 100%)",
+            boxShadow: name.trim() ? "0 6px 20px rgba(19, 104, 206, 0.4)" : "none",
           }}
         >
-          JOIN GAME
+          SIGUIENTE
         </button>
       </form>
     );
@@ -305,13 +458,33 @@ export default function GamePage() {
     );
     setHasSubmitted(true);
 
-    // Show result immediately (computed locally, no need to wait for server)
     const isCorrect = answerIndex === currentQuestion.correctAnswer;
     setPlayerAnswerResult({
       correct: isCorrect,
       score: player.score || 0,
     });
   };
+
+  
+  const buildLeaderboardEntries = useCallback(() => {
+    if (!game) return [];
+    return game.players.map((p, idx) => {
+      const prevIdx = previousLeaderboard.findIndex(pl => pl.playerId === p.id);
+      return {
+        playerId: p.id,
+        name: p.name,
+        score: p.score,
+        previousPosition: prevIdx >= 0 ? prevIdx : idx,
+        currentPosition: idx,
+        avatar: p.avatar,
+      };
+    }).sort((a, b) => b.score - a.score).map((entry, idx) => ({
+      ...entry,
+      currentPosition: idx,
+    }));
+  }, [game, previousLeaderboard]);
+
+  const currentAvatarSeed = playerAvatarSeed || player?.name || "";
 
   if (loading)
     return (
@@ -354,7 +527,7 @@ export default function GamePage() {
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Game Header */}
+        
         <div 
           className="text-center space-y-3 py-4 sm:py-6 px-4 sm:px-8 bg-white/15 backdrop-blur-sm rounded-3xl"
           style={{ animation: "slide-up 0.5s ease-out" }}
@@ -374,7 +547,32 @@ export default function GamePage() {
           </div>
         </div>
 
-        {/* Waiting */}
+        
+        {game.status === "cancelled" && (
+          <div
+            className="bg-white rounded-3xl shadow-xl p-8 text-center"
+            style={{ animation: "bounce-in 0.6s ease-out" }}
+          >
+            <div className="text-5xl mb-4">🚪</div>
+            <p className="text-xl font-bold text-gray-800">
+              El anfitrión cerró la partida
+            </p>
+            <p className="text-gray-500 mt-2">
+              Esta partida nunca se inició.
+            </p>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center mt-6 px-6 py-3 text-base font-bold text-white rounded-full transition-all hover:scale-105"
+              style={{
+                background: "linear-gradient(135deg, #1368CE 0%, #0D47A1 100%)",
+              }}
+            >
+              Volver al inicio
+            </Link>
+          </div>
+        )}
+
+        
         {game.status === "waiting" && (
           <div 
             className="bg-white rounded-3xl shadow-xl p-8 text-center"
@@ -388,8 +586,9 @@ export default function GamePage() {
           </div>
         )}
 
-        {/* ACTIVE - question in progress */}
+        
         {game.status === "active" &&
+          gamePhase === 'question' &&
           !isQuestionFinished &&
           !hasSubmitted &&
           currentQuestion && (
@@ -399,57 +598,83 @@ export default function GamePage() {
             />
           )}
 
-        {/* ACTIVE - question finished, player answered correctly */}
+        
         {game.status === "active" &&
-          hasSubmitted &&
-          playerAnswerResult && playerAnswerResult.correct && (
-            <div 
+          gamePhase === 'question' &&
+          hasSubmitted && (
+            <div
               className="bg-white rounded-3xl shadow-xl p-8 text-center"
-              style={{ animation: "bounce-in 0.5s ease-out" }}
+              style={{ animation: "bounce-in 0.4s ease-out" }}
             >
-              <div className="text-6xl mb-4">🎉</div>
-              <p className="text-3xl font-black text-[#26890C]">
-                Correct!
+              <div className="text-5xl mb-4">✅</div>
+              <p className="text-xl font-bold text-gray-800">
+                ¡Respuesta enviada!
               </p>
-              <p className="text-xl font-bold text-[#26890C]/80 mt-2">
-                +{playerAnswerResult.score} points
+              <p className="text-gray-500 mt-2">
+                Esperando a los demás jugadores...
               </p>
             </div>
           )}
 
-        {/* ACTIVE - question finished, player answered incorrectly */}
+        
         {game.status === "active" &&
+          gamePhase === 'showing-result' &&
           hasSubmitted &&
-          playerAnswerResult && !playerAnswerResult.correct && (
-            <div 
-              className="bg-white rounded-3xl shadow-xl p-8 text-center"
-              style={{ animation: "bounce-in 0.5s ease-out" }}
-            >
-              <div className="text-6xl mb-4">✗</div>
-              <p className="text-3xl font-black text-[#E21B3C]">
-                Incorrect!
-              </p>
-              <p className="text-gray-500 mt-2">Better luck next time!</p>
+          playerAnswerResult && (
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              <div className="animate-avatar-pop">
+                <Avatar
+                  seed={currentAvatarSeed}
+                  size={120}
+                  expression={playerAnswerResult.correct ? 'happy' : 'sad'}
+                  accessories={playerAccessories}
+                />
+              </div>
+              {playerAnswerResult.correct ? (
+                <div className="animate-slide-in-up">
+                  <p className="text-green-400 text-2xl font-black">✅ ¡Correcto!</p>
+                  <p className="text-white text-lg">+{playerAnswerResult.score} puntos</p>
+                </div>
+              ) : (
+                <div className="animate-slide-in-up">
+                  <p className="text-red-400 text-2xl font-black">❌ Incorrecto</p>
+                  <p className="text-white/70">Mejor suerte la próxima vez</p>
+                </div>
+              )}
             </div>
           )}
 
-        {/* ACTIVE - question finished, player did NOT answer */}
+        
         {game.status === "active" &&
+          gamePhase === 'showing-result' &&
           isQuestionFinished &&
           !playerAnswerResult && (
-            <div 
-              className="bg-white rounded-3xl shadow-xl p-8 text-center"
-              style={{ animation: "bounce-in 0.5s ease-out" }}
-            >
-              <div className="text-5xl mb-4">⏰</div>
-              <p className="text-xl font-bold text-[#FFC900]">
-                Time&apos;s up!
-              </p>
-              <p className="text-gray-500 mt-2">You didn&apos;t submit an answer.</p>
+            <div className="flex flex-col items-center justify-center text-center space-y-4">
+              <div className="animate-avatar-pop">
+                <Avatar
+                  seed={currentAvatarSeed}
+                  size={120}
+                  expression="sad"
+                  accessories={playerAccessories}
+                />
+              </div>
+              <div className="animate-slide-in-up">
+                <p className="text-yellow-400 text-2xl font-black">⏰ ¡Tiempo!</p>
+                <p className="text-white/70">No enviaste respuesta</p>
+              </div>
             </div>
           )}
 
-        {/* FINISHED */}
+        
+        {game.status === "active" &&
+          gamePhase === 'showing-scoreboard' && (
+            <Scoreboard
+              entries={buildLeaderboardEntries()}
+              currentPlayerId={player.id}
+            />
+          )}
+
+        
         {game.status === "finished" && (
           <Results gameId={gameId} results={results} />
         )}

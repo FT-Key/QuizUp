@@ -1,4 +1,4 @@
-import type { Game, Player, CreateGameData, Question } from "@/types";
+import type { Game, Player, CreateGameData, Question, PlayerAvatar } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 import { DEFAULT_TIME_LIMIT_MS } from "@/constants/game";
 
@@ -12,6 +12,7 @@ class GameStore {
       text: q.text,
       options: q.options,
       correctAnswer: q.correctAnswer,
+      image: q.image ?? null,
     }));
 
     const game: Game = {
@@ -41,7 +42,7 @@ class GameStore {
     return game.questions[game.currentQuestionIndex];
   }
 
-  addPlayer(gameId: string, playerName: string): Player | null {
+  addPlayer(gameId: string, playerName: string, avatar?: PlayerAvatar): Player | null {
     const game = this.games.get(gameId);
     if (!game) return null;
 
@@ -52,6 +53,7 @@ class GameStore {
       answers: {},
       score: 0,
       joinedAt: new Date(),
+      avatar: avatar || { seed: playerName },
     };
 
     this.players.set(player.id, player);
@@ -74,10 +76,8 @@ class GameStore {
     const question = game.questions.find((q) => q.id === questionId);
     if (!question) return false;
 
-    // Guardar respuesta
     player.answers[questionId] = answer;
 
-    // Calcular score con bonus por tiempo (centésimas)
     if (answer === question.correctAnswer) {
       player.score += 1;
       const elapsed = Date.now() - game.currentQuestionStartTime;
@@ -87,7 +87,6 @@ class GameStore {
       }
     }
 
-    // Verificar si todos respondieron
     const allAnswered = game.players.every(
       (p) => p.answers[questionId] !== undefined
     );
@@ -124,7 +123,6 @@ class GameStore {
     }
   }
 
-  // SOLO limpiar el inicio de la pregunta (no volver a sumar score)
   finishQuestion(gameId: string): boolean {
     const game = this.games.get(gameId);
     if (!game) return false;
@@ -161,6 +159,7 @@ class GameStore {
           game.questions.length > 0
             ? (correctAnswers / game.questions.length) * 100
             : 0,
+        avatar: p.avatar,
       };
     });
 
