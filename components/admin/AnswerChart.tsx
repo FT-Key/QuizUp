@@ -10,8 +10,15 @@ import {
   ResponsiveContainer,
   LabelList,
 } from "recharts";
+import { KAHOOT_COLORS } from "@/constants/option-colors";
 
-const OPTION_COLORS = ["#E21B3C", "#1368CE", "#FFC900", "#26890C"];
+/** Orden del admin: Red, Blue, Yellow, Green (invertido 2↔3 vs. jugador/creador). */
+const OPTION_COLORS = [
+  KAHOOT_COLORS.red.bg,
+  KAHOOT_COLORS.blue.bg,
+  KAHOOT_COLORS.yellow.bg,
+  KAHOOT_COLORS.green.bg,
+];
 const LETTERS = ["A", "B", "C", "D"];
 
 interface AnswerChartProps {
@@ -24,7 +31,7 @@ export function AnswerChart({ options, counts, correctIndex }: AnswerChartProps)
   const data = options.map((option, index) => ({
     name: LETTERS[index],
     count: counts[index] ?? 0,
-    color: OPTION_COLORS[index] ?? "#9CA3AF",
+    color: OPTION_COLORS[index] ?? "#9CA3AF", // 5.ª opción sin color de la paleta
     text: option,
     correct: index === correctIndex,
   }));

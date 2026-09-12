@@ -62,6 +62,7 @@ export function createUnsplashSearchGateway(
       }
 
       if (!res.ok) {
+        // best-effort: sin cuerpo del error si la lectura falla
         const detail = await res.text().catch(() => "");
         deps.logger.error("[unsplash] error", { status: res.status, detail });
         return { kind: "provider_error", status: res.status };
@@ -83,6 +84,7 @@ export function createUnsplashSearchGateway(
       return {
         kind: "ok",
         payload: {
+          // URL/alt vacíos inválidos: se conserva `||` en los fallbacks de campos.
           results: (data.results ?? []).map((photo) => ({
             id: photo.id,
             url: photo.urls?.regular || photo.urls?.full || "",

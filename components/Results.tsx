@@ -32,8 +32,8 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
           const data = await response.json();
           setFetchedResults(data.results);
         }
-      } catch (error) {
-
+      } catch {
+        return; // best-effort: sin resultados; el panel muestra su estado vacío
       } finally {
         setLoading(false);
       }

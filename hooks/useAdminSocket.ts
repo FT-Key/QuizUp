@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "./useSocket";
 import { getGameSessionFacade } from "@/infra/client-container";
 import type { Game, Player, Question, GameResults } from "@/types";
+import { GAME_STATUS } from "@/core/domain/game/constants";
+import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
 
 export const useAdminSocket = (gameId: string) => {
   const [game, setGame] = useState<Game | null>(null);
@@ -74,7 +76,7 @@ export const useAdminSocket = (gameId: string) => {
                 ? {
                     ...prev,
                     currentQuestionStartTime:
-                      Date.now() - (prev.questionTimeLimit || 30000),
+                      Date.now() - (prev.questionTimeLimit || FALLBACK_QUESTION_TIME_LIMIT_MS),
                   }
                 : prev
             );
@@ -87,7 +89,7 @@ export const useAdminSocket = (gameId: string) => {
             if (data.game) {
               setGame(data.game);
             } else {
-              setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
+              setGame((prev) => (prev ? { ...prev, status: GAME_STATUS.FINISHED } : prev));
             }
             if (data.results) {
               setResults(data.results);
@@ -103,7 +105,7 @@ export const useAdminSocket = (gameId: string) => {
               setGame(data.game);
             } else {
               setGame((prev) =>
-                prev ? { ...prev, status: "cancelled" } : prev
+                prev ? { ...prev, status: GAME_STATUS.CANCELLED } : prev
               );
             }
             setLoading(false);
@@ -123,7 +125,7 @@ export const useAdminSocket = (gameId: string) => {
               ...incomingGame,
               currentQuestionIndex,
               currentQuestionStartTime:
-                Date.now() - ((incomingGame.questionTimeLimit || 30000) - timeLeft),
+                Date.now() - ((incomingGame.questionTimeLimit || FALLBACK_QUESTION_TIME_LIMIT_MS) - timeLeft),
             });
             setLoading(false);
           },

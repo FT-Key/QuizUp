@@ -80,7 +80,7 @@ export function createGameSessionFacade(
         return;
       }
 
-      const name = playerName || session.get("playerName");
+      const name = playerName || session.get("playerName"); // nombre vacío inválido: `||` correcto
       if (!name) return;
 
       bus.emit("join-game", {
@@ -88,7 +88,7 @@ export function createGameSessionFacade(
         playerId: session.get("playerId"),
         playerName: name,
         avatar: {
-          seed: session.get("playerAvatarSeed") || name,
+          seed: session.get("playerAvatarSeed") || name, // seed vacío inválido: `||` correcto
           accessories: session.getAccessories(),
         },
       });
@@ -166,7 +166,7 @@ export function createHttpGameFetcher(): (
       const data = (await res.json()) as { game?: Game };
       return data.game ?? null;
     } catch {
-      return null;
+      return null; // best-effort: fallback HTTP no disponible ⇒ null; el retry de la facade decide
     }
   };
 }

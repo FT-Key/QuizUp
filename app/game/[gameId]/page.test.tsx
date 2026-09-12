@@ -576,3 +576,55 @@ describe("GamePage (caracterización US-14)", () => {
     expect(sonnerMock.error).toHaveBeenCalledWith("Failed to join the game");
   });
 });
+
+/**
+ * CARACTERIZACIÓN US-17 (BL-06) — `PlayerJoinForm` module-level sin remonte.
+ *
+ * Reutiliza el harness de la página (mocks de arriba). Si el formulario se
+ * redefiniera inline dentro de `GamePage`, el re-render del padre cambiaría la
+ * identidad del tipo de elemento y React lo remontaría, perdiendo el texto y
+ * el paso `joinStep`.
+ */
+describe("GamePage — PlayerJoinForm sin remonte (caracterización US-17 BL-06)", () => {
+  it("conserva el texto del input tras un re-render del padre (game-updated)", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ game: makeGame({ players: [] }) }));
+
+    render(<GamePage />);
+    await screen.findByText("Join the Quiz");
+
+    const input = screen.getByPlaceholderText(
+      "Enter a display name..."
+    ) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "Carla" } });
+    expect(input.value).toBe("Carla");
+
+    // Re-render del padre: llega un game-updated por el socket mockeado.
+    await trigger("game-updated", { game: makeGame({ players: [] }) });
+
+    const after = screen.getByPlaceholderText(
+      "Enter a display name..."
+    ) as HTMLInputElement;
+    expect(after.value).toBe("Carla");
+    // Misma identidad de nodo ⇒ no hubo desmonte/remonte.
+    expect(after).toBe(input);
+  });
+
+  it("conserva el paso avatar tras un re-render del padre (game-updated)", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ game: makeGame({ players: [] }) }));
+
+    render(<GamePage />);
+    await screen.findByText("Join the Quiz");
+
+    fireEvent.change(screen.getByPlaceholderText("Enter a display name..."), {
+      target: { value: "Carla" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "SIGUIENTE" }));
+    expect(screen.getByRole("button", { name: "JOIN GAME" })).toBeTruthy();
+
+    await trigger("game-updated", { game: makeGame({ players: [] }) });
+
+    // Un remonte volvería al paso "name"; el paso avatar persiste.
+    expect(screen.getByRole("button", { name: "JOIN GAME" })).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Enter a display name...")).toBeNull();
+  });
+});

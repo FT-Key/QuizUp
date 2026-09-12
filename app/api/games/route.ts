@@ -7,6 +7,7 @@ import { getContainer } from "@/infra/container";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   return handle(async () => {
+    // best-effort: body no-JSON ⇒ 400
     const raw = await request.json().catch(() => null);
     if (!raw) return error("Invalid JSON body", 400);
 

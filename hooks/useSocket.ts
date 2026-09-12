@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getGameSessionFacade } from "@/infra/client-container";
+import type { SocketEvents } from "@/types";
 
 export interface SocketEvent {
-  event: string;
+  event: keyof SocketEvents;
   callback: (...args: any[]) => void;
 }
 
@@ -53,6 +54,7 @@ export const useSocket = ({
       offDisconnect();
     };
     // playerName NO es dependencia: paridad con el efecto legacy [gameId, isAdmin].
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facade, gameId, isAdmin]);
 
   // Suscripción estable: solo cambia si cambian los NOMBRES de evento (no la identidad del array).

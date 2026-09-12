@@ -1,5 +1,7 @@
+import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
 import type { Game } from "../game";
 import type { Player } from "../player";
+import { GAME_STATUS, QUESTION_NOT_STARTED } from "./constants";
 
 /** Fases resolubles desde el estado del servidor. `showing-scoreboard` es UI (timer de 4 s). */
 export type ResolvableGamePhase = "question" | "showing-result";
@@ -30,7 +32,7 @@ export function resolveGamePhase(
   me: Player | null | undefined,
   now: number
 ): GamePhaseResolution | null {
-  if (game.status !== "active") return null;
+  if (game.status !== GAME_STATUS.ACTIVE) return null;
 
   const question = game.questions[game.currentQuestionIndex];
   if (!question) return null;
@@ -40,9 +42,9 @@ export function resolveGamePhase(
     game.players.length > 0 &&
     game.players.every((p) => p.answers?.[question.id] !== undefined);
   const timeExpired =
-    game.currentQuestionStartTime === 0 ||
-    (game.currentQuestionStartTime > 0 &&
-      now >= game.currentQuestionStartTime + (game.questionTimeLimit || 30000));
+    game.currentQuestionStartTime === QUESTION_NOT_STARTED ||
+    (game.currentQuestionStartTime > QUESTION_NOT_STARTED &&
+      now >= game.currentQuestionStartTime + (game.questionTimeLimit || FALLBACK_QUESTION_TIME_LIMIT_MS));
   const questionFinished = allAnswered || timeExpired;
 
   const answerResult =

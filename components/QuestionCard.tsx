@@ -2,12 +2,14 @@
 
 import { useState, useCallback } from "react"
 import type { Question } from "@/types"
+import { KAHOOT_COLORS, OPTION_ICONS } from "@/constants/option-colors"
 
-const KAHOOT_COLORS = [
-  { bg: "#E21B3C", name: "Red", icon: "▲" },
-  { bg: "#1368CE", name: "Blue", icon: "◆" },
-  { bg: "#26890C", name: "Green", icon: "●" },
-  { bg: "#FFC900", name: "Yellow", icon: "■" },
+/** Orden del jugador: Red, Blue, Green, Yellow (invertido 2↔3 vs. admin). */
+const OPTION_COLORS = [
+  KAHOOT_COLORS.red,
+  KAHOOT_COLORS.blue,
+  KAHOOT_COLORS.green,
+  KAHOOT_COLORS.yellow,
 ]
 
 interface QuestionCardProps {
@@ -70,13 +72,13 @@ export function QuestionCard({ question, onAnswerSubmit }: QuestionCardProps) {
               ${isSubmitting && selectedAnswer === index ? "animate-pulse" : ""}
             `}
             style={{
-              backgroundColor: KAHOOT_COLORS[index].bg,
+              backgroundColor: OPTION_COLORS[index].bg,
               animation: selectedAnswer === null ? `bounce-in ${0.3 + index * 0.1}s ease-out` : "none",
             }}
           >
 
             <span className="text-5xl md:text-6xl text-white/90 mb-2">
-              {KAHOOT_COLORS[index].icon}
+              {OPTION_ICONS[index]}
             </span>
 
             <span className="text-lg md:text-xl font-bold text-white leading-tight">

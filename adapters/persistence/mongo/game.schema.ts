@@ -1,4 +1,5 @@
 import { Schema, model, models } from "mongoose";
+import { GAME_STATUS } from "@/core/domain/game/constants";
 
 // US-11 §3.5: schema canónico del modelo `Game` del frontend, con el índice
 // compuesto `{ status: 1, createdAt: 1 }` del contrato §4. El registro
@@ -46,8 +47,13 @@ const gameSchema = new Schema({
   creatorId: { type: String, required: true },
   status: {
     type: String,
-    enum: ["waiting", "active", "finished", "cancelled"],
-    default: "waiting",
+    enum: [
+      GAME_STATUS.WAITING,
+      GAME_STATUS.ACTIVE,
+      GAME_STATUS.FINISHED,
+      GAME_STATUS.CANCELLED,
+    ],
+    default: GAME_STATUS.WAITING,
   },
   currentQuestionIndex: { type: Number, default: 0 },
   currentQuestionStartTime: { type: Number, default: 0 },
@@ -58,4 +64,4 @@ const gameSchema = new Schema({
 
 gameSchema.index({ status: 1, createdAt: 1 });
 
-export const GameModel = models.Game || model("Game", gameSchema);
+export const GameModel = models.Game ?? model("Game", gameSchema);

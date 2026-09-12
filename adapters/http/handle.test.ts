@@ -57,7 +57,11 @@ describe("adapters/http/handle", () => {
     expect(response.status).toBe(500);
     expect(await json(response)).toEqual({ error: "Internal server error" });
     expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith("Error creating game:", cause);
+    expect(consoleErrorSpy).toHaveBeenCalledWith("Error creating game:", {
+      name: "Error",
+      message: "fallo de mongo",
+      stack: cause.stack,
+    });
   });
 
   it("GameLockedError sigue mapeando 400 por código CONFLICT (el 403 es override de la ruta de join)", async () => {

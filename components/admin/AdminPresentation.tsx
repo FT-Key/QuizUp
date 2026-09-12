@@ -3,12 +3,15 @@
 import { AnswerChart } from "./AnswerChart";
 import { Loader2, PauseCircle, SkipForward, Square } from "lucide-react";
 import type { Game } from "@/types";
+import { KAHOOT_COLORS, OPTION_ICONS } from "@/constants/option-colors";
+import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
 
+/** Orden del admin: Red, Blue, Yellow, Green (invertido 2↔3 vs. jugador/creador). */
 const OPTION_STYLES = [
-  { bg: "#E21B3C", shape: "▲", text: "text-white" },
-  { bg: "#1368CE", shape: "◆", text: "text-white" },
-  { bg: "#FFC900", shape: "●", text: "text-gray-900" },
-  { bg: "#26890C", shape: "■", text: "text-white" },
+  { bg: KAHOOT_COLORS.red.bg, shape: OPTION_ICONS[0], text: "text-white" },
+  { bg: KAHOOT_COLORS.blue.bg, shape: OPTION_ICONS[1], text: "text-white" },
+  { bg: KAHOOT_COLORS.yellow.bg, shape: OPTION_ICONS[2], text: "text-gray-900" },
+  { bg: KAHOOT_COLORS.green.bg, shape: OPTION_ICONS[3], text: "text-white" },
 ];
 
 interface AdminPresentationProps {
@@ -50,7 +53,7 @@ export function AdminPresentation({
       game.players.filter((p) => p.answers?.[question.id] === index).length
   );
 
-  const timeLimit = game.questionTimeLimit || 30000;
+  const timeLimit = game.questionTimeLimit || FALLBACK_QUESTION_TIME_LIMIT_MS;
   const timePct = questionEnded
     ? 0
     : Math.max(0, Math.min(100, (timeLeft / timeLimit) * 100));

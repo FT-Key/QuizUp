@@ -9,13 +9,14 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { asSocket, createFakeSocket, type FakeSocket } from "@/tests/fakes/socket";
+import type { SocketEvents } from "@/types";
 
 const mocks = vi.hoisted(() => ({ io: vi.fn() }));
 
 vi.mock("socket.io-client", () => ({ io: mocks.io }));
 
 interface TestSocketEvent {
-  event: string;
+  event: keyof SocketEvents;
   callback: (...args: unknown[]) => void;
 }
 
