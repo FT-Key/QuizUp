@@ -4,10 +4,10 @@ import { useState, useCallback } from "react"
 import type { Question } from "@/types"
 
 const KAHOOT_COLORS = [
-  { bg: "#E21B3C", hover: "#C41834", name: "Red", icon: "▲" },
-  { bg: "#1368CE", hover: "#105AB0", name: "Blue", icon: "◆" },
-  { bg: "#26890C", hover: "#1E7209", name: "Green", icon: "●" },
-  { bg: "#FFC900", hover: "#E0B200", name: "Yellow", icon: "■" },
+  { bg: "#E21B3C", name: "Red", icon: "▲" },
+  { bg: "#1368CE", name: "Blue", icon: "◆" },
+  { bg: "#26890C", name: "Green", icon: "●" },
+  { bg: "#FFC900", name: "Yellow", icon: "■" },
 ]
 
 interface QuestionCardProps {

@@ -76,37 +76,4 @@ describe("adapters/socket/socket-client (caracterización US-13)", () => {
 
     expect(mocks.io).toHaveBeenCalledWith("https://sockets.example.test", EXPECTED_OPTIONS);
   });
-
-  it("getSocket es null antes de init y devuelve la instancia después", async () => {
-    const { getSocket, initSocket } = await loadSocketModule();
-
-    expect(getSocket()).toBeNull();
-
-    const socket = initSocket();
-
-    expect(getSocket()).toBe(socket);
-    expect(getSocket()).toBe(created[0]);
-  });
-
-  it("disconnectSocket llama a disconnect() y deja getSocket() en null", async () => {
-    const { disconnectSocket, getSocket, initSocket } = await loadSocketModule();
-
-    initSocket();
-    disconnectSocket();
-
-    expect(created[0].disconnectedCount).toBe(1);
-    expect(getSocket()).toBeNull();
-  });
-
-  it("tras desconectar, un nuevo initSocket crea otra instancia", async () => {
-    const { disconnectSocket, initSocket } = await loadSocketModule();
-
-    const first = initSocket();
-    disconnectSocket();
-    const second = initSocket();
-
-    expect(second).not.toBe(first);
-    expect(created).toHaveLength(2);
-    expect(mocks.io).toHaveBeenCalledTimes(2);
-  });
 });

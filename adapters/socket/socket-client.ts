@@ -37,15 +37,6 @@ export const initSocket = (): Socket<SocketEvents> => {
   return socket;
 };
 
-export const getSocket = (): Socket<SocketEvents> | null => socket;
-
-export const disconnectSocket = (): void => {
-  if (socket) {
-    socket.disconnect();
-    socket = null;
-  }
-};
-
 /** Envuelve el singleton en el puerto `RealtimeClient`. */
 export function createSocketRealtimeClient(): RealtimeClient {
   const s = initSocket();
