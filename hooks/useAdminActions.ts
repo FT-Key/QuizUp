@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Dispatch, SetStateAction } from "react";
+import type { Emit } from "@/adapters/socket/socket-event-bus";
 import type { Game } from "@/types";
 import { GAME_STATUS } from "@/core/domain/game/constants";
 import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
@@ -11,7 +12,7 @@ export interface UseAdminActionsOptions {
   gameId: string;
   game: Game | null;
   setGame: Dispatch<SetStateAction<Game | null>>;
-  emit: (event: string, data?: unknown) => void;
+  emit: Emit;
 }
 
 export interface AdminActions {
@@ -23,7 +24,7 @@ export interface AdminActions {
   finishGame(): Promise<void>;
   /** emit + index+1 + startTime Date.now(). */
   nextQuestion(): void;
-  /** emit finish-question + startTime Date.now() - (limit || 30000). */
+  /** emit finish-question + startTime Date.now() - (limit || FALLBACK_QUESTION_TIME_LIMIT_MS). */
   forceEndQuestion(): void;
   kickPlayer(playerId: string): void;
   /** if (!game) return; emit lock-game con !game.locked. */

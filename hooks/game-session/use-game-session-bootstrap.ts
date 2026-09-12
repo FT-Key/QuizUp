@@ -2,11 +2,10 @@
 
 import { useEffect } from "react";
 import type { MutableRefObject } from "react";
+import type { Emit } from "@/adapters/socket/socket-event-bus";
 import type { PlayerSession } from "@/core/application/ports/player-session";
 import type { Game, Player } from "@/types";
 import type { GameSessionSetters } from "./types";
-
-type Emit = (event: string, data?: unknown) => void;
 
 /** Fetch inicial del juego + re-join con la sesión persistida (una vez por `gameId`). */
 export function useGameSessionBootstrap({

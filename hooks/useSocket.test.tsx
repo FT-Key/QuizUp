@@ -9,22 +9,17 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { asSocket, createFakeSocket, type FakeSocket } from "@/tests/fakes/socket";
-import type { SocketEvents } from "@/types";
+import type { SocketEvent } from "@/hooks/useSocket";
 
 const mocks = vi.hoisted(() => ({ io: vi.fn() }));
 
 vi.mock("socket.io-client", () => ({ io: mocks.io }));
 
-interface TestSocketEvent {
-  event: keyof SocketEvents;
-  callback: (...args: unknown[]) => void;
-}
-
 interface UseSocketOptions {
   gameId: string;
   playerName?: string;
   isAdmin?: boolean;
-  events?: TestSocketEvent[];
+  events?: SocketEvent[];
 }
 
 interface JoinGamePayload {

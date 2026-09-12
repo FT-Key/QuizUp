@@ -29,6 +29,15 @@ export type ServerEventName = Exclude<keyof SocketEvents, ClientEventName>;
 export type ClientEmitPayload<E extends ClientEventName> =
   Parameters<SocketEvents[E]> extends [infer P, ...unknown[]] ? P : undefined;
 
+/**
+ * Firma de emisión tipada por evento: correlaciona el nombre con su payload
+ * (`join-game` → `JoinGameData`; los eventos sin payload no llevan argumentos).
+ */
+export type Emit = <E extends ClientEventName>(
+  event: E,
+  payload?: ClientEmitPayload<E>
+) => void;
+
 export interface SocketEventBus {
   on<E extends ServerEventName>(event: E, handler: SocketEvents[E]): Unsubscribe;
   off<E extends ServerEventName>(event: E, handler: SocketEvents[E]): void;

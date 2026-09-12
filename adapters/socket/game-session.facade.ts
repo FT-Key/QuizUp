@@ -5,7 +5,7 @@ import type {
 } from "@/core/application/ports/realtime-client";
 import type { PlayerSession } from "@/core/application/ports/player-session";
 import type { RetryPolicy } from "@/core/application/ports/retry-policy";
-import type { SocketEventBus } from "./socket-event-bus";
+import type { Emit, SocketEventBus } from "./socket-event-bus";
 
 export interface GameSessionFacadeDeps {
   realtime: RealtimeClient;
@@ -35,8 +35,8 @@ export interface GameSessionFacade {
   closeGame(gameId: string): void;
   leaveGame(gameId: string, playerId: string): void;
 
-  /** Puerta genérica (comandos del admin y joins de página) para eventos dinámicos. */
-  emit(event: string, payload?: unknown): void;
+  /** Puerta genérica tipada (comandos del admin y joins de página). */
+  emit: Emit;
 
   /** Observer para listas dinámicas de los hooks. Devuelve la baja. */
   on(event: string, handler: (...args: unknown[]) => void): Unsubscribe;
@@ -61,13 +61,6 @@ export function createGameSessionFacade(
   deps: GameSessionFacadeDeps
 ): GameSessionFacade {
   const { realtime, bus, session, retryPolicy, fetchGame } = deps;
-
-  // La puerta genérica acepta nombres dinámicos (hooks/páginas); el bus tipado
-  // queda detrás de este cast confinado.
-  const emitUntyped = bus.emit as unknown as (
-    event: string,
-    payload?: unknown
-  ) => void;
 
   return {
     get connected() {
@@ -106,7 +99,7 @@ export function createGameSessionFacade(
       bus.emit("leave-game", { gameId, playerId }),
 
     emit: (event, payload) => {
-      emitUntyped(event, payload);
+      bus.emit(event, payload);
     },
 
     on: (event, handler) => realtime.on(event, handler),
