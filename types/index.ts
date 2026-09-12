@@ -133,16 +133,6 @@ export interface SocketEvents {
     timeLeft: number;
   }) => void;
 
-  /**
-   * @deprecated Evento sin emisor (muerto). Se elimina en US-15.
-   * El evento vigente es `question-changed`.
-   */
-  "question-updated": (data: {
-    question: Question;
-    questionIndex: number;
-    timeLeft: number;
-  }) => void;
-
   "question-finished": (data: { currentQuestionIndex: number }) => void;
 
   "question-changed": (data: {
