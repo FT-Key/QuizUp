@@ -1,80 +1,18 @@
-
 import { NextResponse } from "next/server";
-import connectToDB from "@/lib/mongoose";
-import { Game } from "@/models/Game";
-import type { Game as GameType } from "@/types";
-import { DEFAULT_TIME_LIMIT_MS } from "@/constants/game";
+import { toStartGameDto } from "@/adapters/persistence/mongo/game.mapper";
+import { handle } from "@/adapters/http/handle";
+import { ok } from "@/adapters/http/next-response";
+import { getContainer } from "@/infra/container";
 
 interface Params {
   params: { gameId: string };
 }
 
-export async function POST(req: Request, { params }: Params) {
-  try {
-    const { gameId } = params;
-
-    await connectToDB();
-
-    const gameDoc = await Game.findOne({ gameCode: gameId });
-    if (!gameDoc) {
-      return NextResponse.json({ error: "Game not found" }, { status: 404 });
-    }
-
-    if (gameDoc.status !== "waiting") {
-      return NextResponse.json(
-        { error: "Game cannot be started" },
-        { status: 400 }
-      );
-    }
-
-    if (!gameDoc.players || gameDoc.players.length === 0) {
-      return NextResponse.json(
-        { error: "Cannot start game with no players" },
-        { status: 400 }
-      );
-    }
-
-    gameDoc.status = "active";
-    gameDoc.currentQuestionIndex = 0;
-    gameDoc.currentQuestionStartTime = Date.now();
-    gameDoc.questionTimeLimit =
-      gameDoc.questionTimeLimit || DEFAULT_TIME_LIMIT_MS;
-
-    await gameDoc.save();
-
-    const game: GameType = {
-      id: gameDoc.gameCode,
-      name: gameDoc.name,
-      questions: (gameDoc.questions || []).map((q: any) => ({
-        id: q._id?.toString() || "",
-        text: q.text,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-        image: q.image ?? null,
-      })),
-      creatorId: gameDoc.creatorId,
-      status: gameDoc.status,
-      currentQuestionIndex: gameDoc.currentQuestionIndex,
-      currentQuestionStartTime: gameDoc.currentQuestionStartTime,
-      questionTimeLimit: gameDoc.questionTimeLimit,
-      createdAt: gameDoc.createdAt,
-      players: (gameDoc.players || []).map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        gameId: gameDoc.gameCode,
-        answers: p.answers || {},
-        score: p.score || 0,
-        joinedAt: p.joinedAt,
-        avatar: p.avatar || undefined,
-      })),
-    };
-
-    return NextResponse.json({ game });
-  } catch (error) {
-    console.error("Error starting game:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+export async function POST(req: Request, { params }: Params): Promise<NextResponse> {
+  return handle(async () => {
+    const game = await getContainer().useCases.startGame.execute({
+      gameId: params.gameId,
+    });
+    return ok({ game: toStartGameDto(game) });
+  }, "Error starting game:");
 }

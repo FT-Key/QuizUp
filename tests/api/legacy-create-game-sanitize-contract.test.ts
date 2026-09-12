@@ -1,55 +1,45 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
+import type { GameRepository } from "@/core/application/ports/game-repository";
+import type { Game } from "@/core/domain/game";
+import {
+  createFakeContainer,
+  type FakeContainerOptions,
+  type FakeContainerResult,
+} from "@/tests/fakes/container";
 
 // US-12: caracterización de la validación de creación (`sanitizeQuizData`) tal
-// como la consume `POST /api/games` (pre-refactor). Congela los mensajes
+// como la consume `POST /api/games` (post-refactor US-12). Congela los mensajes
 // exactos de `QuizFileError`, los límites de `QUIZ_FILE_LIMITS`, el truncado de
 // `name`, los time limits permitidos, el saneo de imágenes y la limpieza de
 // caracteres de control.
 //
 // `legacy-error-contract.test.ts` ya congela el 400 de `questions: []`, el 400
 // `Missing required fields` y el happy path con el default 20000; acá solo se
-// cubren los huecos. Sin Mongo: se mockean `@/lib/mongoose`, `@/models/Game`,
-// `uuid` y `@/lib/gameCode`, y se inspeccionan los argumentos de `Game.create`
-// (patrón de `tests/api/legacy-error-contract.test.ts`).
+// cubren los huecos. Sin Mongo: el seam es `vi.mock("@/infra/container")` y las
+// aserciones de persistencia se leen del repo fake (`repo.findById`).
 
-const { jsonMock, connectToDBMock, createMock, uuidMock, uniqueGameCodeMock } =
-  vi.hoisted(() => ({
-    jsonMock: vi.fn((body: unknown, init?: { status?: number }) => ({
-      body,
-      status: init?.status ?? 200,
-    })),
-    connectToDBMock: vi.fn(async () => ({ connection: { readyState: 1 } })),
-    createMock: vi.fn(),
-    uuidMock: vi.fn(() => "uuid-test-0001"),
-    uniqueGameCodeMock: vi.fn(async () => "123456"),
-  }));
+const { jsonMock, getContainerMock } = vi.hoisted(() => ({
+  jsonMock: vi.fn((body: unknown, init?: { status?: number }) => ({
+    body,
+    status: init?.status ?? 200,
+  })),
+  getContainerMock: vi.fn(),
+}));
 
 vi.mock("next/server", () => ({
   NextResponse: { json: jsonMock },
 }));
 
-vi.mock("@/lib/mongoose", () => ({
-  default: connectToDBMock,
-}));
-
-vi.mock("@/models/Game", () => ({
-  Game: { create: createMock },
-}));
-
-vi.mock("uuid", () => ({
-  v4: uuidMock,
-}));
-
-vi.mock("@/lib/gameCode", () => ({
-  getUniqueGameCode: uniqueGameCodeMock,
+vi.mock("@/infra/container", () => ({
+  getContainer: getContainerMock,
 }));
 
 import { POST as createGame } from "../../app/api/games/route";
 
 interface CapturedResponse {
   /** Body pre-serialización capturado por el mock de `NextResponse.json`. */
-  body: any;
+  body: { game?: Game; error?: unknown };
   status: number;
 }
 
@@ -63,6 +53,13 @@ async function capture(
   return (await responsePromise) as unknown as CapturedResponse;
 }
 
+/** Partida persistida en el repo fake (la ruta siempre usa el código default). */
+async function persistedGame(repo: GameRepository): Promise<Game> {
+  const game = await repo.findById("123456");
+  if (!game) throw new Error("La partida no fue persistida en el repo fake");
+  return game;
+}
+
 /** Pregunta válida mínima; `overrides` permite romper un campo a la vez. */
 function question(overrides: Record<string, unknown> = {}) {
   return {
@@ -73,44 +70,26 @@ function question(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Doc mínimo que `Game.create` devuelve; a la ruta le alcanzan estos campos. */
-function createdDoc(overrides: Record<string, unknown> = {}) {
-  return {
-    gameCode: "123456",
-    name: "Quiz",
-    questions: [],
-    creatorId: "uuid-test-0001",
-    status: "waiting",
-    currentQuestionIndex: 0,
-    createdAt: new Date("2026-01-01T00:00:00.000Z"),
-    ...overrides,
-  };
-}
-
-/** Argumento con el que la ruta llamó a `Game.create`. */
-function persistedGame(): any {
-  return createMock.mock.calls[0][0];
-}
-
 describe("POST /api/games — validación de sanitizeQuizData (caracterización US-12)", () => {
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let fake: FakeContainerResult;
+
+  function setupFake(options?: FakeContainerOptions): FakeContainerResult {
+    fake = createFakeContainer(options);
+    getContainerMock.mockReturnValue(fake.container);
+    return fake;
+  }
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // `clearAllMocks` no borra implementaciones de tests previos.
-    createMock.mockReset();
-    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    consoleErrorSpy.mockRestore();
+    setupFake();
   });
 
   async function expectSanitizeError(body: unknown, message: string) {
     const response = await capture(createGame(fakeRequest(body)));
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: message });
-    expect(createMock).not.toHaveBeenCalled();
+    // El legacy llamaba a `Game.create` solo tras el saneo; acá el repo queda vacío.
+    await expect(fake.games.findById("123456")).resolves.toBeNull();
   }
 
   it("questions ausente responde 400 con el mensaje de archivo sin preguntas", async () => {
@@ -185,20 +164,17 @@ describe("POST /api/games — validación de sanitizeQuizData (caracterización 
   });
 
   it("un name de más de 80 caracteres se trunca a 80 y se persiste truncado (no rechaza)", async () => {
-    createMock.mockResolvedValue(createdDoc());
-
     const response = await capture(
       createGame(fakeRequest({ name: "A".repeat(85), questions: [question()] }))
     );
 
     expect(response.status).toBe(201);
-    expect(persistedGame().name).toBe("A".repeat(80));
-    expect(persistedGame().name).toHaveLength(80);
+    const stored = await persistedGame(fake.games);
+    expect(stored.name).toBe("A".repeat(80));
+    expect(stored.name).toHaveLength(80);
   });
 
   it("questionTimeLimit 30000 (permitido) se persiste tal cual", async () => {
-    createMock.mockResolvedValue(createdDoc());
-
     const response = await capture(
       createGame(
         fakeRequest({
@@ -210,12 +186,10 @@ describe("POST /api/games — validación de sanitizeQuizData (caracterización 
     );
 
     expect(response.status).toBe(201);
-    expect(persistedGame().questionTimeLimit).toBe(30000);
+    expect((await persistedGame(fake.games)).questionTimeLimit).toBe(30000);
   });
 
   it("questionTimeLimit 12345 (no permitido) cae al default 20000", async () => {
-    createMock.mockResolvedValue(createdDoc());
-
     const response = await capture(
       createGame(
         fakeRequest({
@@ -227,12 +201,10 @@ describe("POST /api/games — validación de sanitizeQuizData (caracterización 
     );
 
     expect(response.status).toBe(201);
-    expect(persistedGame().questionTimeLimit).toBe(20000);
+    expect((await persistedGame(fake.games)).questionTimeLimit).toBe(20000);
   });
 
   it("un image.url http (no https) se persiste como image: null", async () => {
-    createMock.mockResolvedValue(createdDoc());
-
     const response = await capture(
       createGame(
         fakeRequest({
@@ -245,12 +217,10 @@ describe("POST /api/games — validación de sanitizeQuizData (caracterización 
     );
 
     expect(response.status).toBe(201);
-    expect(persistedGame().questions[0].image).toBeNull();
+    expect((await persistedGame(fake.games)).questions[0].image).toBeNull();
   });
 
   it("un image.url https de un host ajeno a unsplash se persiste como image: null", async () => {
-    createMock.mockResolvedValue(createdDoc());
-
     const response = await capture(
       createGame(
         fakeRequest({
@@ -261,12 +231,10 @@ describe("POST /api/games — validación de sanitizeQuizData (caracterización 
     );
 
     expect(response.status).toBe(201);
-    expect(persistedGame().questions[0].image).toBeNull();
+    expect((await persistedGame(fake.games)).questions[0].image).toBeNull();
   });
 
   it("un image.url https de unsplash se persiste con la url normalizada", async () => {
-    createMock.mockResolvedValue(createdDoc());
-
     const response = await capture(
       createGame(
         fakeRequest({
@@ -280,14 +248,12 @@ describe("POST /api/games — validación de sanitizeQuizData (caracterización 
     );
 
     expect(response.status).toBe(201);
-    expect(persistedGame().questions[0].image).toEqual({
+    expect((await persistedGame(fake.games)).questions[0].image).toEqual({
       url: "https://images.unsplash.com/photo-1",
     });
   });
 
   it("el texto limpia caracteres de control y recorta espacios", async () => {
-    createMock.mockResolvedValue(createdDoc());
-
     const response = await capture(
       createGame(
         fakeRequest({
@@ -298,7 +264,7 @@ describe("POST /api/games — validación de sanitizeQuizData (caracterización 
     );
 
     expect(response.status).toBe(201);
-    expect(persistedGame().questions[0].text).toBe("Hola");
+    expect((await persistedGame(fake.games)).questions[0].text).toBe("Hola");
   });
 
   it("un texto que queda vacío tras limpiar responde 400 'Pregunta 1 (texto): no puede estar vacío.'", async () => {

@@ -5,6 +5,7 @@ import { createJoinGameUseCase } from "@/core/application/use-cases/join-game";
 import type { Game } from "@/core/domain/game";
 import {
   ConflictError,
+  GameLockedError,
   NotFoundError,
   ValidationError,
 } from "@/core/domain/errors";
@@ -180,7 +181,7 @@ describe("core/application/use-cases/join-game", () => {
     });
   });
 
-  it("una partida locked lanza ConflictError; la ruta legacy lo fuerza a 403", async () => {
+  it("una partida locked lanza GameLockedError (ConflictError); la ruta legacy lo fuerza a 403", async () => {
     const games = createInMemoryGameRepository([
       gameFixture({ locked: true }),
     ]);
@@ -195,6 +196,8 @@ describe("core/application/use-cases/join-game", () => {
     );
 
     expect(error).toBeInstanceOf(ConflictError);
+    // US-12 (U2): subclase dedicada que la ruta de join convierte en 403.
+    expect(error).toBeInstanceOf(GameLockedError);
     expect(error).toMatchObject({
       code: "CONFLICT",
       message: "Game entry is locked",

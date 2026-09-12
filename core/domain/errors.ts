@@ -27,3 +27,10 @@ export class ValidationError extends DomainError {
     super("VALIDATION", message);
   }
 }
+
+/**
+ * US-12 (U2): subclase de conflicto para el 403 legacy de "Game entry is
+ * locked". El mapper genérico sigue dando 400 (code CONFLICT); el override a
+ * 403 lo hace la ruta de join.
+ */
+export class GameLockedError extends ConflictError {}
