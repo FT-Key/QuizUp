@@ -35,8 +35,6 @@ export interface FakeSocketOptions {
 export interface FakeSocket {
   connected: boolean;
   id?: string;
-  /** Veces que se llamó a `disconnect()` (lo usa `disconnectSocket`). */
-  readonly disconnectedCount: number;
   on(event: string, listener: SocketListener): FakeSocket;
   off(event: string, listener: SocketListener): FakeSocket;
   emit(event: string, ...args: unknown[]): FakeSocket;
@@ -56,14 +54,10 @@ export interface FakeSocket {
 export function createFakeSocket(options: FakeSocketOptions = {}): FakeSocket {
   const listeners = new Map<string, Set<SocketListener>>();
   const emitted: EmittedCall[] = [];
-  let disconnectedCount = 0;
 
   const socket: FakeSocket = {
     connected: options.connected ?? false,
     id: options.id,
-    get disconnectedCount() {
-      return disconnectedCount;
-    },
     on(event, listener) {
       const set = listeners.get(event) ?? new Set<SocketListener>();
       set.add(listener);
@@ -79,7 +73,6 @@ export function createFakeSocket(options: FakeSocketOptions = {}): FakeSocket {
       return socket;
     },
     disconnect() {
-      disconnectedCount += 1;
       socket.connected = false;
     },
     get emitted() {

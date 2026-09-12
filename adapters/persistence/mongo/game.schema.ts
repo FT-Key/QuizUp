@@ -1,10 +1,9 @@
 import { Schema, model, models } from "mongoose";
 
-// US-11 §3.5: copia canónica de `models/Game.ts` (que queda intacto hasta US-15)
-// más el índice compuesto `{ status: 1, createdAt: 1 }` del contrato §4.
-// Registro idempotente `models.Game || model("Game", ...)`: mientras convivan
-// ambos schemas, el primero importado en el proceso registra el modelo y el
-// otro lo reutiliza (mismo nombre "Game", un único modelo compilado).
+// US-11 §3.5: schema canónico del modelo `Game` del frontend, con el índice
+// compuesto `{ status: 1, createdAt: 1 }` del contrato §4. El registro
+// idempotente `models.Game || model("Game", ...)` evita recompilar el modelo
+// cuando el módulo se importa más de una vez en el mismo proceso (hot reload).
 
 const questionImageSchema = new Schema(
   {

@@ -4,16 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
 import { usePlayerSession } from "@/hooks/usePlayerSession";
-import { resolveGamePhase } from "@/core/domain/game/phase-resolver";
+import {
+  resolveGamePhase,
+  type PlayerAnswerResult,
+} from "@/core/domain/game/phase-resolver";
 import type { Game, GameResults, Player, Question } from "@/types";
 
 /** Fase de UI. `showing-scoreboard` la setea SOLO el timer de 4 s (nunca el resolver). */
 export type GamePhase = "waiting" | "question" | "showing-result" | "showing-scoreboard";
-
-export interface PlayerAnswerResult {
-  correct: boolean;
-  score: number;
-}
 
 export interface PreviousLeaderboardEntry {
   playerId: string;

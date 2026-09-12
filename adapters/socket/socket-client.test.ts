@@ -1,9 +1,11 @@
 /**
  * CARACTERIZACIÓN US-13 — `adapters/socket/socket-client.ts` (singleton y opciones de conexión).
  *
- * Migrado 1:1 desde `lib/socket.test.ts` en US-13: el cuerpo de `lib/socket.ts` se
- * movió a `adapters/socket/socket-client.ts` y este archivo solo cambia el import
- * del módulo bajo prueba. Las 6 aserciones se mantienen intactas.
+ * Deriva de `lib/socket.test.ts` (US-13): el cuerpo de `lib/socket.ts` se movió a
+ * `adapters/socket/socket-client.ts` y este archivo solo cambió el import del
+ * módulo bajo prueba. US-15 retiró la API de socket muerta y sus casos; la suite
+ * vigente caracteriza únicamente `initSocket`: singleton, URL por defecto/entorno
+ * y opciones de reconexión.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { asSocket, createFakeSocket, type FakeSocket } from "@/tests/fakes/socket";
@@ -75,38 +77,5 @@ describe("adapters/socket/socket-client (caracterización US-13)", () => {
     initSocket();
 
     expect(mocks.io).toHaveBeenCalledWith("https://sockets.example.test", EXPECTED_OPTIONS);
-  });
-
-  it("getSocket es null antes de init y devuelve la instancia después", async () => {
-    const { getSocket, initSocket } = await loadSocketModule();
-
-    expect(getSocket()).toBeNull();
-
-    const socket = initSocket();
-
-    expect(getSocket()).toBe(socket);
-    expect(getSocket()).toBe(created[0]);
-  });
-
-  it("disconnectSocket llama a disconnect() y deja getSocket() en null", async () => {
-    const { disconnectSocket, getSocket, initSocket } = await loadSocketModule();
-
-    initSocket();
-    disconnectSocket();
-
-    expect(created[0].disconnectedCount).toBe(1);
-    expect(getSocket()).toBeNull();
-  });
-
-  it("tras desconectar, un nuevo initSocket crea otra instancia", async () => {
-    const { disconnectSocket, initSocket } = await loadSocketModule();
-
-    const first = initSocket();
-    disconnectSocket();
-    const second = initSocket();
-
-    expect(second).not.toBe(first);
-    expect(created).toHaveLength(2);
-    expect(mocks.io).toHaveBeenCalledTimes(2);
   });
 });
