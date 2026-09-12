@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { initSocket } from "@/lib/socket";
-import type { Socket } from "socket.io-client";
+import { getGameSessionFacade } from "@/infra/client-container";
 
 export interface SocketEvent {
   event: string;
@@ -16,6 +15,10 @@ interface UseSocketOptions {
   events?: SocketEvent[];
 }
 
+/**
+ * Conexión realtime de la página (jugador/admin) sobre `GameSessionFacade`.
+ * Devuelve `{ emit, connected }`; el `socket` crudo ya no se expone (US-13).
+ */
 export const useSocket = ({
   gameId,
   playerName,
@@ -23,68 +26,50 @@ export const useSocket = ({
   events = [],
 }: UseSocketOptions) => {
   const [connected, setConnected] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
+  const facade = getGameSessionFacade();
 
-  if (!socketRef.current) {
-    socketRef.current = initSocket();
-  }
-
-  const socket = socketRef.current;
-
+  // Handlers siempre frescos sin re-suscribir por identidad del array.
+  const handlersRef = useRef(events);
   useEffect(() => {
-    const handleConnect = () => {
+    handlersRef.current = events;
+  });
+  const eventsKey = events.map((e) => e.event).join("|");
+
+  // Conexión + join (misma semántica que el legacy: re-join en cada `connect`).
+  useEffect(() => {
+    const offConnect = facade.onConnect(() => {
       setConnected(true);
+      facade.join({ gameId, playerName, isAdmin });
+    });
+    const offDisconnect = facade.onDisconnect(() => setConnected(false));
 
-      if (isAdmin) {
-
-        socket.emit("join-admin", gameId);
-      } else {
-        const name = playerName || localStorage.getItem("playerName");
-        const savedPlayerId = localStorage.getItem("playerId");
-        const savedAvatarSeed = localStorage.getItem("playerAvatarSeed");
-        let savedAccessories: string[] = [];
-        try {
-          const raw = localStorage.getItem("playerAvatarAccessories");
-          if (raw) savedAccessories = JSON.parse(raw);
-        } catch {}
-        if (name) {
-
-          socket.emit("join-game", {
-            gameId,
-            playerId: savedPlayerId,
-            playerName: name,
-            avatar: { seed: savedAvatarSeed || name, accessories: savedAccessories },
-          });
-        }
-      }
-    };
-    const handleDisconnect = () => setConnected(false);
-
-    socket.on("connect", handleConnect);
-    socket.on("disconnect", handleDisconnect);
-
-    if (socket.connected) {
-      handleConnect();
+    if (facade.connected) {
+      setConnected(true);
+      facade.join({ gameId, playerName, isAdmin });
     }
 
     return () => {
-      socket.off("connect", handleConnect);
-      socket.off("disconnect", handleDisconnect);
+      offConnect();
+      offDisconnect();
     };
-  }, [gameId, isAdmin]);
+    // playerName NO es dependencia: paridad con el efecto legacy [gameId, isAdmin].
+  }, [facade, gameId, isAdmin]);
 
+  // Suscripción estable: solo cambia si cambian los NOMBRES de evento (no la identidad del array).
   useEffect(() => {
+    const names = Array.from(new Set(eventsKey.split("|").filter(Boolean)));
+    const unsubs = names.map((name) =>
+      facade.on(name, (...args) => {
+        for (const { event, callback } of handlersRef.current) {
+          if (event === name) callback(...args);
+        }
+      })
+    );
 
-    events.forEach(({ event, callback }) => socket.on(event, callback));
-    return () => {
-      events.forEach(({ event, callback }) => socket.off(event, callback));
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [facade, eventsKey]);
 
-    };
-  }, [events]);
+  const emit = (event: string, data?: unknown) => facade.emit(event, data);
 
-  const emit = (event: string, data?: any) => {
-    socket.emit(event, data);
-  };
-
-  return { socket, emit, connected };
+  return { emit, connected };
 };
