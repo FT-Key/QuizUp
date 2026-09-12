@@ -2,20 +2,18 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSocket } from "./useSocket";
+import { getGameSessionFacade } from "@/infra/client-container";
 import type { Game, Player, Question, GameResults } from "@/types";
-
-const MAX_RETRIES = 5;
-const RETRY_DELAY_MS = 3000;
 
 export const useAdminSocket = (gameId: string) => {
   const [game, setGame] = useState<Game | null>(null);
   const [results, setResults] = useState<GameResults | null>(null);
   const [loading, setLoading] = useState(true);
-  const [retryTick, setRetryTick] = useState(0);
 
-  const triedHttpFallback = useRef(false);
+  const fallbackRequested = useRef(false);
+  const gameSession = getGameSessionFacade();
 
-  const { socket, emit, connected } = useSocket({
+  const { emit, connected } = useSocket({
     gameId,
     isAdmin: true,
     events: useMemo(
@@ -135,60 +133,30 @@ export const useAdminSocket = (gameId: string) => {
     ),
   });
 
-  const fetchGameViaHttp = async () => {
-    try {
-
-      const res = await fetch(`/api/games/${gameId}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.game) {
-          setGame(data.game);
-          setLoading(false);
-        }
-      }
-    } catch (err) {
-
-    }
-  };
-
+  // Primer request al conectar (y en cada reconexión).
   useEffect(() => {
-    if (!socket || !gameId || !connected) return;
+    if (!connected) return;
 
-    socket.emit("request-game-state", { gameId });
-  }, [socket, gameId, connected]);
+    gameSession.requestGameState(gameId);
+  }, [gameSession, connected, gameId]);
 
+  // Retry + fallback: el bucle vive en la facade; el hook lo cancela cuando llega estado.
   useEffect(() => {
     if (!loading) return;
 
-    if (retryTick >= MAX_RETRIES) {
-      if (!triedHttpFallback.current) {
-        triedHttpFallback.current = true;
-        fetchGameViaHttp();
-      }
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setRetryTick((t) => t + 1);
-    }, RETRY_DELAY_MS);
-
-    return () => clearTimeout(timer);
-  }, [loading, retryTick]);
-
-  useEffect(() => {
-    if (retryTick === 0 || !loading) return;
-    if (retryTick <= MAX_RETRIES && socket && connected) {
-
-      socket.emit("request-game-state", { gameId });
-    }
-  }, [retryTick, socket, connected, gameId, loading]);
-
-  useEffect(() => {
-    if (!connected) return;
-    if (loading && socket) {
-      socket.emit("request-game-state", { gameId });
-    }
-  }, [connected]);
+    return gameSession.scheduleGameStateRetry(gameId, {
+      onExhausted: () => {
+        if (fallbackRequested.current) return; // EXACTAMENTE UNA VEZ (caracterizado)
+        fallbackRequested.current = true;
+        void gameSession.fetchGameState(gameId).then((httpGame) => {
+          if (httpGame) {
+            setGame(httpGame);
+            setLoading(false);
+          }
+        });
+      },
+    });
+  }, [gameSession, gameId, loading]);
 
   return { game, setGame, emit, loading, results };
 };

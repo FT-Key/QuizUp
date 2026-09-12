@@ -10,6 +10,7 @@ import { AvatarSelector } from "@/components/AvatarSelector";
 import { Scoreboard } from "@/components/Scoreboard";
 import { Loader2, Users, Clock } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
+import { usePlayerSession } from "@/hooks/usePlayerSession";
 import type { Game, Player, GameResults, Question, PlayerAvatar } from "@/types";
 
 type GamePhase = 'waiting' | 'question' | 'showing-result' | 'showing-scoreboard';
@@ -17,6 +18,7 @@ type GamePhase = 'waiting' | 'question' | 'showing-result' | 'showing-scoreboard
 export default function GamePage() {
   const params = useParams();
   const gameId = params.gameId as string;
+  const session = usePlayerSession();
 
   const [game, setGame] = useState<Game | null>(null);
   const [player, setPlayer] = useState<Player | null>(null);
@@ -90,16 +92,11 @@ export default function GamePage() {
         const data = await res.json();
         setGame(data.game);
 
-        const playerId = localStorage.getItem("playerId");
-        const playerName = localStorage.getItem("playerName");
-        const avatarSeed = localStorage.getItem("playerAvatarSeed");
-        const accessoriesStr = localStorage.getItem("playerAvatarAccessories");
+        const playerId = session.get("playerId");
+        const playerName = session.get("playerName");
+        const avatarSeed = session.get("playerAvatarSeed");
         if (avatarSeed) setPlayerAvatarSeed(avatarSeed);
-        if (accessoriesStr) {
-          try {
-            setPlayerAccessories(JSON.parse(accessoriesStr));
-          } catch {}
-        }
+        setPlayerAccessories(session.getAccessories());
 
         if (playerId && playerName) {
           const foundPlayer = data.game.players.find(
@@ -113,7 +110,7 @@ export default function GamePage() {
               playerId,
               avatar: {
                 seed: avatarSeed || playerName,
-                accessories: accessoriesStr ? JSON.parse(accessoriesStr).filter((a: string) => a !== 'none') : [],
+                accessories: session.getAccessories().filter((a) => a !== 'none'),
               },
             });
 
@@ -140,7 +137,7 @@ export default function GamePage() {
   }, [gameId]);
 
   const emitRef = useRef<((event: string, data?: any) => void) | null>(null);
-  const { socket, emit } = useSocket({
+  const { emit } = useSocket({
     gameId,
     events: useMemo(
       () => [
@@ -149,8 +146,8 @@ export default function GamePage() {
           callback: (data: { player: Player; game: Game }) => {
             
             if (data.player) {
-              localStorage.setItem("playerId", data.player.id);
-              localStorage.setItem("playerName", data.player.name);
+              session.set("playerId", data.player.id);
+              session.set("playerName", data.player.name);
               setPlayer(data.player);
               if (data.player.avatar?.seed) {
                 setPlayerAvatarSeed(data.player.avatar.seed);
@@ -193,7 +190,7 @@ export default function GamePage() {
             const lb = data.game.players.map(p => ({ playerId: p.id, score: p.score }));
             setPreviousLeaderboard(lb);
 
-            const pid = localStorage.getItem("playerId");
+            const pid = session.get("playerId");
             if (pid) {
               const found = data.game.players.find((p) => p.id === pid);
               if (found) setPlayer(found);
@@ -207,7 +204,7 @@ export default function GamePage() {
             const updatedGame = payload.game;
             setGame(updatedGame);
 
-            const pid = localStorage.getItem("playerId");
+            const pid = session.get("playerId");
             if (pid) {
               const found = updatedGame.players.find((p) => p.id === pid);
               if (found) {
@@ -230,7 +227,7 @@ export default function GamePage() {
               
               setIsQuestionFinished(allAnswered);
               if (allAnswered) {
-                const pid2 = localStorage.getItem("playerId");
+                const pid2 = session.get("playerId");
                 if (pid2) {
                   const me = updatedGame.players.find((p) => p.id === pid2);
                   if (me) {
@@ -269,7 +266,7 @@ export default function GamePage() {
           }) => {
             
             setGame(payload.game);
-            const pid = localStorage.getItem("playerId");
+            const pid = session.get("playerId");
             if (pid) {
               const found = payload.game.players.find((p) => p.id === pid);
               if (found) {
@@ -337,8 +334,9 @@ export default function GamePage() {
   }, [emit]);
 
   function JoinForm() {
+    const session = usePlayerSession();
     const [name, setName] = useState<string>(() => {
-      return localStorage.getItem("playerName") || "";
+      return session.get("playerName") ?? "";
     });
     const [avatarSeed, setAvatarSeed] = useState<string>("");
     const [avatarAccessories, setAvatarAccessories] = useState<string[]>([]);
@@ -354,10 +352,10 @@ export default function GamePage() {
     const handleJoin = () => {
       if (!emit) return;
       const trimmed = name.trim();
-      localStorage.setItem("playerName", trimmed);
-      if (avatarSeed) localStorage.setItem("playerAvatarSeed", avatarSeed);
+      session.set("playerName", trimmed);
+      if (avatarSeed) session.set("playerAvatarSeed", avatarSeed);
       if (avatarAccessories.length > 0) {
-        localStorage.setItem("playerAvatarAccessories", JSON.stringify(avatarAccessories));
+        session.setAccessories(avatarAccessories);
       }
       emit("join-game", {
         gameId,
