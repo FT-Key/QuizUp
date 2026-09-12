@@ -5,8 +5,8 @@
  * `router.push`. Mockea `next/navigation` y `fetch`; no toca red real.
  *
  * NOTA DE ENTORNO: el tsconfig raíz usa `"jsx": "preserve"` (lo exige Next), que
- * Vite 8 respeta y deja el JSX sin transformar en Vitest. `components/tsconfig.json`
- * anida `"jsx": "react-jsx"` solo para el pipeline de tests de `components/`;
+ * Vite 8 respeta y deja el JSX sin transformar en Vitest. `vitest.config.ts` fija
+ * `oxc: { jsx: { runtime: "automatic" } }` para todos los proyectos de test;
  * Next y `tsc` siguen leyendo el tsconfig raíz.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

@@ -7,6 +7,10 @@ import path from "node:path";
 // suelto necesita otro entorno puntual, se puede usar el docblock
 // `// @vitest-environment jsdom` en la primera línea del propio test.
 export default defineConfig({
+  // US-13: el tsconfig raíz usa "jsx": "preserve" (Next). Oxc compila los .tsx de
+  // los tests (hooks/componentes). Reemplaza al tsconfig anidado
+  // components/tsconfig.json (eliminado).
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     projects: [
       {

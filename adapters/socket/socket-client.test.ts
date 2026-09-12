@@ -1,10 +1,9 @@
 /**
- * CARACTERIZACIÓN US-13 — `lib/socket.ts` (singleton y opciones de conexión).
+ * CARACTERIZACIÓN US-13 — `adapters/socket/socket-client.ts` (singleton y opciones de conexión).
  *
- * NOTA (cambio intencional declarado en US-13): durante la implementación de la
- * historia este módulo se moverá a `adapters/socket/socket-client.ts`. Este test
- * migrará de ruta en esa misma US manteniendo las aserciones sobre singleton,
- * opciones de `io`, `getSocket` y `disconnectSocket`.
+ * Migrado 1:1 desde `lib/socket.test.ts` en US-13: el cuerpo de `lib/socket.ts` se
+ * movió a `adapters/socket/socket-client.ts` y este archivo solo cambia el import
+ * del módulo bajo prueba. Las 6 aserciones se mantienen intactas.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { asSocket, createFakeSocket, type FakeSocket } from "@/tests/fakes/socket";
@@ -22,11 +21,13 @@ const EXPECTED_OPTIONS = {
   reconnectionDelay: 1000,
 };
 
-async function loadSocketModule(): Promise<typeof import("@/lib/socket")> {
-  return import("@/lib/socket");
+async function loadSocketModule(): Promise<
+  typeof import("@/adapters/socket/socket-client")
+> {
+  return import("@/adapters/socket/socket-client");
 }
 
-describe("lib/socket (caracterización US-13)", () => {
+describe("adapters/socket/socket-client (caracterización US-13)", () => {
   const created: FakeSocket[] = [];
 
   beforeEach(() => {

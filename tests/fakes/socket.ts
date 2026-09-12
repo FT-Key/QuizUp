@@ -1,4 +1,5 @@
 import type { Socket } from "socket.io-client";
+import type { RealtimeClient } from "@/core/application/ports/realtime-client";
 
 // US-13: doble mínimo de `socket.io-client` para caracterizar `useSocket`,
 // `useAdminSocket` y `lib/socket`. No usa estado global: cada llamada a
@@ -109,4 +110,25 @@ export function createFakeSocket(options: FakeSocketOptions = {}): FakeSocket {
 /** Cast de conveniencia para devolver el fake desde un `io` mockeado. */
 export function asSocket(fake: FakeSocket): Socket {
   return fake as unknown as Socket;
+}
+
+/** Adapta el fake de socket.io-client al puerto `RealtimeClient`. */
+export function asRealtimeClient(fake: FakeSocket): RealtimeClient {
+  return {
+    get connected() {
+      return fake.connected;
+    },
+    on: (event, handler) => {
+      fake.on(event, handler);
+      return () => {
+        fake.off(event, handler);
+      };
+    },
+    off: (event, handler) => {
+      fake.off(event, handler);
+    },
+    emit: (event, ...args) => {
+      fake.emit(event, ...args);
+    },
+  };
 }
