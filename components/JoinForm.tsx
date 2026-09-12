@@ -14,7 +14,9 @@ export function JoinForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [step, setStep] = useState<'name' | 'avatar'>('name')
-  const [formData, setFormData] = useState<JoinGameData>({
+  // El estado local siempre inicializa `playerName`: la opcionalidad del evento
+  // no aplica al formulario (invariante local declarada, sin cambio de runtime).
+  const [formData, setFormData] = useState<JoinGameData & { playerName: string }>({
     gameId: "",
     playerName: "",
   })

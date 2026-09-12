@@ -175,7 +175,7 @@ export function useGameSessionEvents({
         },
         {
           event: "game-finished",
-          callback: (data: { game: Game; results: GameResults }) => {
+          callback: (data: { game: Game; results: GameResults | null }) => {
             if (data.game) {
               setters.setGame(data.game);
             } else {

@@ -84,7 +84,7 @@ export const useAdminSocket = (gameId: string) => {
         },
         {
           event: "game-finished",
-          callback: (data: { game: Game; results: GameResults }) => {
+          callback: (data: { game: Game; results: GameResults | null }) => {
 
             if (data.game) {
               setGame(data.game);
