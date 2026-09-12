@@ -5,6 +5,7 @@ import { Trophy, Users, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { Podium } from "./Podium";
 import { Avatar } from "./Avatar";
+import { calculateAccuracyFromResults } from "@/core/domain/results/accuracy";
 import type { GameResults } from "@/types";
 
 interface ResultsProps {
@@ -84,12 +85,7 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
     );
   }
 
-  const accuracy =
-    results.totalPlayers > 0
-      ? (results.leaderboard.reduce((acc, p) => acc + p.correctAnswers, 0) /
-          (results.totalPlayers * results.totalQuestions)) *
-        100
-      : 0;
+  const accuracy = calculateAccuracyFromResults(results);
 
   return (
     <div className="space-y-8" style={{ animation: "bounce-in 0.6s ease-out" }}>
@@ -131,7 +127,7 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
                 <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-[#FFC900]" />
               </div>
               <p className="text-xs sm:text-sm font-bold text-gray-500 uppercase">Accuracy</p>
-              <p className="text-2xl sm:text-3xl font-black text-[#864CBF]">{accuracy.toFixed(0)}%</p>
+              <p className="text-2xl sm:text-3xl font-black text-[#864CBF]">{accuracy}%</p>
             </div>
           </div>
 
