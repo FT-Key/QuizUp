@@ -1,4 +1,5 @@
 import type { Game } from "../../domain/game";
+import { GAME_STATUS } from "../../domain/game/constants";
 import { ConflictError, NotFoundError } from "../../domain/errors";
 import type { GameRepository } from "../ports/game-repository";
 
@@ -21,12 +22,12 @@ export function createFinishGameUseCase(deps: FinishGameDeps): FinishGameUseCase
         throw new NotFoundError("Game not found");
       }
 
-      if (game.status !== "active") {
+      if (game.status !== GAME_STATUS.ACTIVE) {
         throw new ConflictError("Game cannot be finished");
       }
 
       const updated = await deps.games.setStatusAndIndex(game.id, {
-        status: "finished",
+        status: GAME_STATUS.FINISHED,
         currentQuestionIndex: game.questions.length - 1,
       });
       if (!updated) {

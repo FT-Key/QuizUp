@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useSocket } from "@/hooks/useSocket";
 import type { PlayerSession } from "@/core/application/ports/player-session";
 import type { Game, GameResults, Player, Question } from "@/types";
+import { GAME_STATUS } from "@/core/domain/game/constants";
 import { GAME_PHASE } from "./constants";
 import type { GameSessionSetters } from "./types";
 
@@ -178,7 +179,7 @@ export function useGameSessionEvents({
               setters.setGame(data.game);
             } else {
               setters.setGame((prev) =>
-                prev ? { ...prev, status: "finished" } : prev
+                prev ? { ...prev, status: GAME_STATUS.FINISHED } : prev
               );
             }
             if (data.results) {
@@ -193,7 +194,7 @@ export function useGameSessionEvents({
               setters.setGame(data.game);
             } else {
               setters.setGame((prev) =>
-                prev ? { ...prev, status: "cancelled" } : prev
+                prev ? { ...prev, status: GAME_STATUS.CANCELLED } : prev
               );
             }
           },

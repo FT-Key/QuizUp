@@ -4,6 +4,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { Dispatch, SetStateAction } from "react";
 import type { Game } from "@/types";
+import { GAME_STATUS } from "@/core/domain/game/constants";
+import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
 
 export interface UseAdminActionsOptions {
   gameId: string;
@@ -86,7 +88,7 @@ export function useAdminActions({
         ? {
             ...prev,
             currentQuestionStartTime:
-              Date.now() - (prev.questionTimeLimit || 30000),
+              Date.now() - (prev.questionTimeLimit || FALLBACK_QUESTION_TIME_LIMIT_MS),
           }
         : prev
     );
@@ -103,7 +105,7 @@ export function useAdminActions({
 
   const closeGame = () => {
     emit("close-game", { gameId });
-    setGame((prev) => (prev ? { ...prev, status: "cancelled" } : prev));
+    setGame((prev) => (prev ? { ...prev, status: GAME_STATUS.CANCELLED } : prev));
   };
 
   return {

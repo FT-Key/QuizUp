@@ -4,6 +4,7 @@ import { AnswerChart } from "./AnswerChart";
 import { Loader2, PauseCircle, SkipForward, Square } from "lucide-react";
 import type { Game } from "@/types";
 import { KAHOOT_COLORS, OPTION_ICONS } from "@/constants/option-colors";
+import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
 
 /** Orden del admin: Red, Blue, Yellow, Green (invertido 2↔3 vs. jugador/creador). */
 const OPTION_STYLES = [
@@ -52,7 +53,7 @@ export function AdminPresentation({
       game.players.filter((p) => p.answers?.[question.id] === index).length
   );
 
-  const timeLimit = game.questionTimeLimit || 30000;
+  const timeLimit = game.questionTimeLimit || FALLBACK_QUESTION_TIME_LIMIT_MS;
   const timePct = questionEnded
     ? 0
     : Math.max(0, Math.min(100, (timeLeft / timeLimit) * 100));

@@ -4,6 +4,8 @@ import { useParams } from "next/navigation";
 import { Clock, Loader2, Users } from "lucide-react";
 import { withErrorBoundary } from "@/components/withErrorBoundary";
 import { useGameSession } from "@/hooks/useGameSession";
+import { GAME_PHASE } from "@/hooks/game-session/constants";
+import { GAME_STATUS } from "@/core/domain/game/constants";
 import { AnswerPanel } from "@/components/game/AnswerPanel";
 import { CancelledPanel } from "@/components/game/CancelledPanel";
 import { FinishedPanel } from "@/components/game/FinishedPanel";
@@ -94,11 +96,11 @@ function GamePage() {
           </div>
         </div>
 
-        {game.status === "cancelled" && <CancelledPanel />}
+        {game.status === GAME_STATUS.CANCELLED && <CancelledPanel />}
 
-        {game.status === "waiting" && <WaitingPanel />}
+        {game.status === GAME_STATUS.WAITING && <WaitingPanel />}
 
-        {game.status === "active" && phase === "question" && (
+        {game.status === GAME_STATUS.ACTIVE && phase === GAME_PHASE.QUESTION && (
           <AnswerPanel
             question={game.questions[game.currentQuestionIndex] ?? null}
             hasSubmitted={hasSubmitted}
@@ -107,7 +109,7 @@ function GamePage() {
           />
         )}
 
-        {game.status === "active" && phase === "showing-result" && (
+        {game.status === GAME_STATUS.ACTIVE && phase === GAME_PHASE.SHOWING_RESULT && (
           <ResultPanel
             hasSubmitted={hasSubmitted}
             isQuestionFinished={isQuestionFinished}
@@ -117,7 +119,7 @@ function GamePage() {
           />
         )}
 
-        {game.status === "active" && phase === "showing-scoreboard" && (
+        {game.status === GAME_STATUS.ACTIVE && phase === GAME_PHASE.SHOWING_SCOREBOARD && (
           <ScoreboardPanel
             players={game.players}
             previousLeaderboard={previousLeaderboard}
@@ -125,7 +127,7 @@ function GamePage() {
           />
         )}
 
-        {game.status === "finished" && (
+        {game.status === GAME_STATUS.FINISHED && (
           <FinishedPanel gameId={gameId} results={results} />
         )}
       </div>

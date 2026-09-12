@@ -1,4 +1,5 @@
 import type { Game } from "../../domain/game";
+import { GAME_STATUS } from "../../domain/game/constants";
 import type { Player, PlayerAvatar } from "../../domain/player";
 import {
   ConflictError,
@@ -47,7 +48,7 @@ export function createJoinGameUseCase(deps: JoinGameDeps): JoinGameUseCase {
         throw new NotFoundError("Game not found");
       }
 
-      if (game.status !== "waiting") {
+      if (game.status !== GAME_STATUS.WAITING) {
         throw new ConflictError("Game is no longer accepting players");
       }
 

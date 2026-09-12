@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getGameSessionFacade } from "@/infra/client-container";
+import type { SocketEvents } from "@/types";
 
 export interface SocketEvent {
-  event: string;
+  event: keyof SocketEvents;
   callback: (...args: any[]) => void;
 }
 

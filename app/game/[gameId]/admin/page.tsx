@@ -9,6 +9,8 @@ import { useAdminSocket } from "@/hooks/useAdminSocket";
 import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 import { useAdminActions } from "@/hooks/useAdminActions";
 import { withErrorBoundary } from "@/components/withErrorBoundary";
+import { GAME_STATUS } from "@/core/domain/game/constants";
+import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
 
 function AdminPage() {
   const { gameId } = useParams();
@@ -18,10 +20,10 @@ function AdminPage() {
 
   const { timeLeft, isFinished } = useQuestionTimer(
     game?.currentQuestionStartTime ?? 0,
-    game?.questionTimeLimit ?? 30000
+    game?.questionTimeLimit ?? FALLBACK_QUESTION_TIME_LIMIT_MS
   );
 
-  const questionEnded = game?.status !== "active" || isFinished;
+  const questionEnded = game?.status !== GAME_STATUS.ACTIVE || isFinished;
 
   const {
     isStarting,
@@ -51,7 +53,7 @@ function AdminPage() {
     );
   }
 
-  if (game.status === "cancelled") {
+  if (game.status === GAME_STATUS.CANCELLED) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8 text-center space-y-4">
@@ -88,7 +90,7 @@ function AdminPage() {
     );
   }
 
-  if (game.status === "waiting") {
+  if (game.status === GAME_STATUS.WAITING) {
     return (
       <AdminLobby
         game={game}
@@ -101,7 +103,7 @@ function AdminPage() {
     );
   }
 
-  if (game.status === "active") {
+  if (game.status === GAME_STATUS.ACTIVE) {
     return (
       <AdminPresentation
         game={game}

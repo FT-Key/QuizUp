@@ -1,5 +1,6 @@
 import { DEFAULT_TIME_LIMIT_MS } from "@/constants/game";
 import type { Game } from "../../domain/game";
+import { GAME_STATUS } from "../../domain/game/constants";
 import { ConflictError, NotFoundError } from "../../domain/errors";
 import type { GameRepository } from "../ports/game-repository";
 import type { Clock } from "../ports/clock";
@@ -31,7 +32,7 @@ export function createStartGameUseCase(deps: StartGameDeps): StartGameUseCase {
         throw new NotFoundError("Game not found");
       }
 
-      if (game.status !== "waiting") {
+      if (game.status !== GAME_STATUS.WAITING) {
         throw new ConflictError("Game cannot be started");
       }
 
@@ -40,7 +41,7 @@ export function createStartGameUseCase(deps: StartGameDeps): StartGameUseCase {
       }
 
       const updated = await deps.games.setStatusAndIndex(game.id, {
-        status: "active",
+        status: GAME_STATUS.ACTIVE,
         currentQuestionIndex: 0,
         currentQuestionStartTime: deps.clock.now(),
         questionTimeLimit: game.questionTimeLimit || DEFAULT_TIME_LIMIT_MS,

@@ -1,5 +1,6 @@
 import { DEFAULT_TIME_LIMIT_MS } from "@/constants/game";
 import type { Game } from "../../domain/game";
+import { GAME_STATUS } from "../../domain/game/constants";
 import { ValidationError } from "../../domain/errors";
 import type {
   GameRepository,
@@ -59,7 +60,7 @@ export function createCreateGameUseCase(deps: CreateGameDeps): CreateGameUseCase
         questions: input.questions,
         createdAt: new Date(deps.clock.now()),
         creatorId: deps.ids.next(),
-        status: "waiting",
+        status: GAME_STATUS.WAITING,
         currentQuestionIndex: 0,
         players: [],
         currentQuestionStartTime: 0,
