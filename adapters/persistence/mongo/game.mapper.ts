@@ -159,13 +159,14 @@ export function toDomain(doc: GameDoc): Game {
       name: p.name,
       gameId: doc.gameCode,
       answers: answersToRecord(p.answers),
-      score: p.score || 0,
+      score: p.score ?? 0,
       joinedAt: p.joinedAt,
       avatar: p.avatar ?? undefined,
     })),
-    currentQuestionStartTime: doc.currentQuestionStartTime || 0,
+    currentQuestionStartTime: doc.currentQuestionStartTime ?? 0,
+    // 0 es inválido para el límite: se conserva `||` (D6; distinto del default de creación).
     questionTimeLimit: doc.questionTimeLimit || DEFAULT_TIME_LIMIT_MS,
-    locked: doc.locked || false,
+    locked: doc.locked ?? false,
   };
 }
 

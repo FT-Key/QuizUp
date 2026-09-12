@@ -130,7 +130,7 @@ export function useGameSessionEvents({
                     if (playerAns !== undefined) {
                       setters.setPlayerAnswerResult({
                         correct: playerAns === curQ.correctAnswer,
-                        score: me.score || 0,
+                        score: me.score ?? 0,
                       });
                     }
                   }

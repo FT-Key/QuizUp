@@ -64,4 +64,4 @@ const gameSchema = new Schema({
 
 gameSchema.index({ status: 1, createdAt: 1 });
 
-export const GameModel = models.Game || model("Game", gameSchema);
+export const GameModel = models.Game ?? model("Game", gameSchema);

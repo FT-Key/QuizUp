@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ok } from "@/adapters/http/next-response";
 import { getContainer } from "@/infra/container";
+import { toSafeLogDetail } from "@/lib/log-redact";
 
 // US-12 §4: adaptador HTTP fino de Unsplash. Parse literal de query/page
 // (caracterizado: sin Zod), IP por headers y despacho al caso de uso; el estado
@@ -68,7 +69,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         );
     }
   } catch (cause) {
-    console.error("Error searching Unsplash:", cause);
+    console.error("Error searching Unsplash:", toSafeLogDetail(cause));
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }

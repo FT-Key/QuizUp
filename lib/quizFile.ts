@@ -76,7 +76,7 @@ function safeUnsplashUrl(value: unknown): string | undefined {
     }
     return url.toString();
   } catch {
-    return undefined;
+    return undefined; // URL inválida ⇒ sin imagen (sanitización best-effort)
   }
 }
 

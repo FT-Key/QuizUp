@@ -69,7 +69,7 @@ export function useGameSessionActions({
     setters.setHasSubmitted(true);
     setters.setPlayerAnswerResult({
       correct: answerIndex === currentQuestion.correctAnswer,
-      score: player.score || 0,
+      score: player.score ?? 0,
     });
   };
 

@@ -87,7 +87,7 @@ export function buildQuizExportPayload(
     format: "quizup",
     version: 1,
     exportedAt,
-    name: draft.name || "Quiz sin nombre",
+    name: draft.name || "Quiz sin nombre", // nombre vacío inválido: `||` correcto
     questionTimeLimit: draft.questionTimeLimit,
     questions: draft.questions.map((q) => ({
       text: q.text,
