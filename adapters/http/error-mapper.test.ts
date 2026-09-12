@@ -41,10 +41,10 @@ describe("adapters/http/error-mapper", () => {
     });
   });
 
-  it("string del borde ⇒ 500 con ese mensaje", () => {
+  it("string suelto ⇒ 500 genérico (Δ3 US-18: sin canal de fuga)", () => {
     expect(toHttpError("Invalid JSON body")).toEqual({
       status: 500,
-      message: "Invalid JSON body",
+      message: "Internal server error",
     });
   });
 

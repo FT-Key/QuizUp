@@ -8,8 +8,15 @@ import { getContainer } from "@/infra/container";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   return handle(async () => {
-    // `await request.json()` NO se captura: body no-JSON → handle → 500 (asimetría legacy).
-    const body = parseJoinGameBody(await request.json());
+    let raw: unknown;
+    try {
+      raw = await request.json();
+    } catch {
+      // best-effort: body no-JSON ⇒ 400 (simetría con POST /api/games)
+      return error("Invalid JSON body", 400);
+    }
+
+    const body = parseJoinGameBody(raw);
     try {
       const { player, game } = await getContainer().useCases.joinGame.execute({
         gameId: body.gameId ?? "",

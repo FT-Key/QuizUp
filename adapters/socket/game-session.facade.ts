@@ -147,6 +147,11 @@ export function createGameSessionFacade(
   };
 }
 
+/** Guard del JSON de red: solo un objeto con `game` puede portar estado. */
+function isGamePayload(data: unknown): data is { game?: Game | null } {
+  return typeof data === "object" && data !== null && "game" in data;
+}
+
 /** Default de producción: `fetch` global, mismo contrato que el fallback legacy. */
 export function createHttpGameFetcher(): (
   gameId: string
@@ -156,7 +161,8 @@ export function createHttpGameFetcher(): (
       const res = await fetch(`/api/games/${gameId}`);
       if (!res.ok) return null;
 
-      const data = (await res.json()) as { game?: Game };
+      const data: unknown = await res.json();
+      if (!isGamePayload(data)) return null;
       return data.game ?? null;
     } catch {
       return null; // best-effort: fallback HTTP no disponible ⇒ null; el retry de la facade decide
