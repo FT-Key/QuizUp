@@ -2,11 +2,10 @@
 
 import { useEffect } from "react";
 import type { MutableRefObject } from "react";
+import type { Emit } from "@/adapters/socket/socket-event-bus";
 import type { PlayerSession } from "@/core/application/ports/player-session";
 import type { Game, Player } from "@/types";
 import type { GameSessionSetters } from "./types";
-
-type Emit = (event: string, data?: unknown) => void;
 
 /** Fetch inicial del juego + re-join con la sesión persistida (una vez por `gameId`). */
 export function useGameSessionBootstrap({
@@ -27,8 +26,9 @@ export function useGameSessionBootstrap({
       try {
         const res = await fetch(`/api/games/${gameId}`);
         if (!res.ok) throw new Error("Game not found");
-        const data = (await res.json()) as { game: Game };
-        setters.setGame(data.game);
+        const data: unknown = await res.json();
+        const game = isGamePayload(data) ? data.game ?? null : null;
+        setters.setGame(game);
 
         const playerId = session.get("playerId");
         const playerName = session.get("playerName");
@@ -36,8 +36,8 @@ export function useGameSessionBootstrap({
         if (avatarSeed) setters.setPlayerAvatarSeed(avatarSeed);
         setters.setPlayerAccessories(session.getAccessories());
 
-        if (playerId && playerName) {
-          const foundPlayer = data.game.players.find((p) => p.id === playerId);
+        if (game && playerId && playerName) {
+          const foundPlayer = game.players.find((p) => p.id === playerId);
           if (foundPlayer) {
             if (!foundPlayer.answers) foundPlayer.answers = {};
             setters.setPlayer(foundPlayer);
@@ -53,13 +53,13 @@ export function useGameSessionBootstrap({
             });
 
             const currentQuestion =
-              data.game.questions[data.game.currentQuestionIndex];
+              game.questions[game.currentQuestionIndex];
             if (currentQuestion) {
               setters.setHasSubmitted(
                 foundPlayer.answers?.[currentQuestion.id] !== undefined
               );
             }
-            syncPhaseFromGame(data.game, foundPlayer);
+            syncPhaseFromGame(game, foundPlayer);
           }
         }
       } catch {
@@ -71,4 +71,9 @@ export function useGameSessionBootstrap({
 
     if (gameId) fetchGame();
   }, [gameId, session, syncPhaseFromGame, setters, emitRef]);
+}
+
+/** Guard del JSON de red: solo un objeto con `game` puede portar estado. */
+function isGamePayload(data: unknown): data is { game?: Game | null } {
+  return typeof data === "object" && data !== null && "game" in data;
 }

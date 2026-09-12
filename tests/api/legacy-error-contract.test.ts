@@ -260,13 +260,14 @@ describe("contrato HTTP de errores legacy", () => {
       );
     });
 
-    it("CARACTERIZACIÓN: un body que no es JSON cae al catch y responde 500 (asimetría con POST /api/games)", async () => {
-      // Bug conocido: a diferencia de `/api/games`, esta ruta no captura el
-      // fallo de `request.json()` y lo trata como error interno.
+    it("CARACTERIZACIÓN: un body que no es JSON responde 400 Invalid JSON body (Δ3 US-18: simetría con POST /api/games)", async () => {
+      // Corrección US-18 (Δ3): antes caía al catch como 500; ahora la ruta
+      // captura el fallo de `request.json()` y responde 400, igual que
+      // POST /api/games. El mensaje es el explícito del borde.
       await expectErrorResponse(
         joinGame(brokenJsonRequest()),
-        500,
-        "Internal server error"
+        400,
+        "Invalid JSON body"
       );
     });
 

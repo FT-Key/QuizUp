@@ -1,6 +1,7 @@
 "use client";
 
 import type { MutableRefObject } from "react";
+import type { Emit } from "@/adapters/socket/socket-event-bus";
 import type { PlayerSession } from "@/core/application/ports/player-session";
 import type { Game, Player } from "@/types";
 import type {
@@ -8,8 +9,6 @@ import type {
   GameSessionSetters,
   JoinGamePayload,
 } from "./types";
-
-type Emit = (event: string, data?: unknown) => void;
 
 /** Acciones `join` y `submitAnswer` (mismos cuerpos y guards que el hook original). */
 export function useGameSessionActions({

@@ -8,16 +8,11 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { asSocket, createFakeSocket, type FakeSocket } from "@/tests/fakes/socket";
-import type { SocketEvents } from "@/types";
+import type { SocketEvent } from "@/hooks/useSocket";
 
 const mocks = vi.hoisted(() => ({ io: vi.fn() }));
 
 vi.mock("socket.io-client", () => ({ io: mocks.io }));
-
-interface TestSocketEvent {
-  event: keyof SocketEvents;
-  callback: (...args: unknown[]) => void;
-}
 
 let fake: FakeSocket;
 
@@ -41,7 +36,7 @@ describe("useSocket suscripciones (US-13)", () => {
     const secondCallback = vi.fn();
 
     const { rerender, unmount } = renderHook(
-      ({ events }: { events: TestSocketEvent[] }) =>
+      ({ events }: { events: SocketEvent[] }) =>
         useSocket({ gameId: "g1", events }),
       {
         initialProps: {

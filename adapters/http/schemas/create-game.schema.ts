@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { ValidationError } from "@/core/domain/errors";
-import { QuizFileError, sanitizeQuizData, type SanitizedQuiz } from "@/lib/quizFile";
+import { TIME_LIMIT_OPTIONS } from "@/constants/game";
+import { QuizFileError, sanitizeQuizData, type SanitizedQuiz } from "@/core/domain/quiz-file";
 import { parseBody } from "./parse-body";
+
+const [LIMIT_20S, LIMIT_30S, LIMIT_40S] = TIME_LIMIT_OPTIONS;
 
 export const questionImageSchema = z.object({
   url: z.string(),
@@ -21,7 +24,7 @@ export const sanitizedQuestionSchema = z.object({
 export const createGameSchema = z.object({
   name: z.string().min(1).max(80).optional(),
   questionTimeLimit: z
-    .union([z.literal(20000), z.literal(30000), z.literal(40000)])
+    .union([z.literal(LIMIT_20S), z.literal(LIMIT_30S), z.literal(LIMIT_40S)])
     .optional(),
   questions: z.array(sanitizedQuestionSchema).min(1).max(100),
 });

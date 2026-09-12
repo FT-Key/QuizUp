@@ -14,7 +14,7 @@ import {
   QuizFileError,
   QUIZ_FILE_LIMITS,
   type SanitizedQuiz,
-} from "@/lib/quizFile";
+} from "@/core/domain/quiz-file";
 import {
   buildQuizExportFileName,
   buildQuizExportPayload,

@@ -5,17 +5,14 @@ interface MongooseCache {
   promise: Promise<typeof mongoose> | null;
 }
 
-// Se usa el mismo `globalThis.mongooseCache` que `lib/mongoose.ts` para
-// compartir la conexión si ambos conviven (convivencia US-09..US-12).
-// El cast evita redeclarar el `declare global` del legacy y un conflicto de
-// tipos por duplicación de `var` en el scope global.
-const globalCache = globalThis as unknown as { mongooseCache?: MongooseCache };
-
-const cached: MongooseCache = globalCache.mongooseCache ?? {
+// Se usa el mismo `globalThis.mongooseCache` del legacy para compartir la
+// conexión (convivencia US-09..US-12). El global está declarado tipado en
+// `globals.d.ts`, así que se consume sin cast.
+const cached: MongooseCache = globalThis.mongooseCache ?? {
   conn: null,
   promise: null,
 };
-globalCache.mongooseCache = cached;
+globalThis.mongooseCache = cached;
 
 /**
  * Conexión Mongo del adaptador de persistencia.

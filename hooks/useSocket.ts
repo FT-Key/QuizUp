@@ -2,12 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getGameSessionFacade } from "@/infra/client-container";
+import type { Emit } from "@/adapters/socket/socket-event-bus";
 import type { SocketEvents } from "@/types";
 
-export interface SocketEvent {
-  event: keyof SocketEvents;
-  callback: (...args: any[]) => void;
-}
+/**
+ * Unión discriminada evento↔callback del contrato: cada `event` exige el
+ * callback de `SocketEvents[event]` (correlación exacta, sin comodines).
+ */
+export type SocketEvent = {
+  [E in keyof SocketEvents]: { event: E; callback: SocketEvents[E] };
+}[keyof SocketEvents];
 
 interface UseSocketOptions {
   gameId: string;
@@ -63,7 +67,11 @@ export const useSocket = ({
     const unsubs = names.map((name) =>
       facade.on(name, (...args) => {
         for (const { event, callback } of handlersRef.current) {
-          if (event === name) callback(...args);
+          if (event === name) {
+            // Unión heterogénea de callbacks: cast de despacho confinado (Δ4);
+            // el registro `SocketEvent[]` conserva la correlación evento↔payload.
+            (callback as (...args: unknown[]) => void)(...args);
+          }
         }
       })
     );
@@ -71,7 +79,7 @@ export const useSocket = ({
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [facade, eventsKey]);
 
-  const emit = (event: string, data?: unknown) => facade.emit(event, data);
+  const emit: Emit = (event, payload) => facade.emit(event, payload);
 
   return { emit, connected };
 };

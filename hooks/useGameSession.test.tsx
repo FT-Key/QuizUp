@@ -630,4 +630,18 @@ describe("useGameSession (caracterización US-17 BL-05)", () => {
       score: 120,
     });
   });
+
+  it("regresión US-18: body 200 sin game no rompe el bootstrap (guard)", async () => {
+    // El guard descarta el body y el flujo sigue por el camino feliz: no cae
+    // en el catch (error vacío) ni intenta leer `game.players` con sesión activa.
+    setSession("p1", "Ana");
+    fetchMock.mockResolvedValue(jsonResponse({}));
+
+    const { result } = renderSession();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.game).toBeNull();
+    expect(result.current.error).toBe("");
+    expect(mocks.emit).not.toHaveBeenCalled();
+  });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useSocket } from "./useSocket";
+import { useSocket, type SocketEvent } from "./useSocket";
 import { getGameSessionFacade } from "@/infra/client-container";
 import type { Game, Player, Question, GameResults } from "@/types";
 import { GAME_STATUS } from "@/core/domain/game/constants";
@@ -18,7 +18,7 @@ export const useAdminSocket = (gameId: string) => {
   const { emit, connected } = useSocket({
     gameId,
     isAdmin: true,
-    events: useMemo(
+    events: useMemo<SocketEvent[]>(
       () => [
         {
           event: "player-joined",
@@ -84,7 +84,7 @@ export const useAdminSocket = (gameId: string) => {
         },
         {
           event: "game-finished",
-          callback: (data: { game: Game; results: GameResults }) => {
+          callback: (data: { game: Game; results: GameResults | null }) => {
 
             if (data.game) {
               setGame(data.game);

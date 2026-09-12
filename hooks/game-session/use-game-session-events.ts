@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { toast } from "sonner";
-import { useSocket } from "@/hooks/useSocket";
+import { useSocket, type SocketEvent } from "@/hooks/useSocket";
+import type { Emit } from "@/adapters/socket/socket-event-bus";
 import type { PlayerSession } from "@/core/application/ports/player-session";
 import type { Game, GameResults, Player, Question } from "@/types";
 import { GAME_STATUS } from "@/core/domain/game/constants";
@@ -16,8 +17,6 @@ export interface UseGameSessionEventsOptions {
   setters: GameSessionSetters;
   syncPhaseFromGame: (g: Game, me: Player | null | undefined) => void;
 }
-
-type Emit = (event: string, data?: unknown) => void;
 
 /** Los 9 eventos del socket del jugador; `useSocket` se llama una sola vez. */
 export function useGameSessionEvents({
@@ -33,7 +32,7 @@ export function useGameSessionEvents({
 
   const { emit } = useSocket({
     gameId,
-    events: useMemo(
+    events: useMemo<SocketEvent[]>(
       () => [
         {
           event: "joined",
@@ -175,7 +174,7 @@ export function useGameSessionEvents({
         },
         {
           event: "game-finished",
-          callback: (data: { game: Game; results: GameResults }) => {
+          callback: (data: { game: Game; results: GameResults | null }) => {
             if (data.game) {
               setters.setGame(data.game);
             } else {

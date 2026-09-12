@@ -24,7 +24,7 @@ export interface GamePhaseResolution {
  * - sin pregunta actual ⇒ null.
  * - `hasSubmitted`: `me.answers[q.id] !== undefined` (incluye `0`).
  * - `questionFinished`: `allAnswered` (con `players.length > 0`) o `timeExpired`
- *   (`start === 0` o `now >= start + (limit || 30000)`).
+ *   (`start === 0` o `now >= start + (limit || FALLBACK_QUESTION_TIME_LIMIT_MS)`).
  * - `answerResult` solo si el jugador respondió: `{ correct, score: me.score || 0 }`.
  */
 export function resolveGamePhase(
