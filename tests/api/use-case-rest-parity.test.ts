@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   toDomain,
   toGameDto,
@@ -370,7 +370,7 @@ describe("paridad REST: pipeline US-11 (fake + use cases + mapper)", () => {
   // Referencia: `legacy-game-lifecycle-contract.test.ts` → "inicia la partida:
   // persiste 20000 por defecto, fecha con Date.now() fakeado y devuelve el DTO
   // exacto sin locked".
-  it("POST /api/games/[gameId]/start — sin questionTimeLimit persiste 20000", async () => {
+  it("POST /api/games/[gameId]/start — el caso de uso escribe 20000 (doc sin questionTimeLimit)", async () => {
     const q1 = mongoQuestion("q1", "¿Cuál es la capital de Francia?", 2);
     const doc: GameDoc = {
       gameCode: "123456",
@@ -393,7 +393,13 @@ describe("paridad REST: pipeline US-11 (fake + use cases + mapper)", () => {
         { id: "p2", name: "Beto", gameId: "game-id-viejo", joinedAt: JOINED_AT },
       ],
     };
-    const repo = createInMemoryGameRepository([toDomain(doc)]);
+    // Seed NO circular: el dominio guardado tiene `questionTimeLimit: 0`, un
+    // valor imposible en `toDomain` (normaliza a 20000), así que el 20000
+    // persistido solo puede escribirlo el patch del caso de uso.
+    const repo = createInMemoryGameRepository([
+      { ...toDomain(doc), questionTimeLimit: 0 },
+    ]);
+    const updateSpy = vi.spyOn(repo, "setStatusAndIndex");
     const useCase = createStartGameUseCase({
       games: repo,
       clock: fixedClock(START_NOW),
@@ -401,6 +407,13 @@ describe("paridad REST: pipeline US-11 (fake + use cases + mapper)", () => {
 
     const game = await useCase.execute({ gameId: "123456" });
 
+    // El patch escribe el fallback (espejo de la ruta legacy).
+    expect(updateSpy).toHaveBeenCalledWith("123456", {
+      status: "active",
+      currentQuestionIndex: 0,
+      currentQuestionStartTime: START_NOW,
+      questionTimeLimit: 20000,
+    });
     // Efectos sobre la partida persistida (espejo de `gameDoc` en el legacy).
     await expect(repo.findById("123456")).resolves.toMatchObject({
       status: "active",

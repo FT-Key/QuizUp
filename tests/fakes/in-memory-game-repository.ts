@@ -84,6 +84,8 @@ export function createInMemoryGameRepository(seed: Game[] = []): GameRepository 
         ...newGame,
         questions: newGame.questions.map((question) => ({
           ...question,
+          // Clon de `options`: el store no comparte el array con el input.
+          options: [...question.options] as [string, string, string, string],
           // Id sintético por inserción, análogo al `_id` generado por Mongoose.
           id: `q-${++questionCounter}`,
           image: question.image ?? null,

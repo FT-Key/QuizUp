@@ -11,8 +11,8 @@ import { fixedClock } from "@/tests/fakes/system";
 // US-11 §5/§7: caso de uso StartGame. Paridad con
 // `legacy-game-lifecycle-contract.test.ts`: 404 `Game not found`, 400
 // `Game cannot be started` / `Cannot start game with no players`, y patch
-// `{ status: active, currentQuestionIndex: 0, currentQuestionStartTime: now }`
-// sin reescribir `questionTimeLimit` (ya normalizado en el dominio).
+// `{ status: active, currentQuestionIndex: 0, currentQuestionStartTime: now,
+// questionTimeLimit: game.questionTimeLimit || 20000 }` como el legacy.
 
 const NOW = new Date("2026-03-01T10:00:00.000Z").getTime();
 const CREATED_AT = new Date("2026-01-15T12:00:00.000Z");
@@ -65,18 +65,24 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
 }
 
 describe("core/application/use-cases/start-game", () => {
-  it("activa la partida en la pregunta 0 con el reloj inyectado y sin pisar el timeLimit", async () => {
-    const games = createInMemoryGameRepository([gameFixture()]);
+  it("activa la partida en la pregunta 0 y escribe el questionTimeLimit con fallback", async () => {
+    // Seed de dominio con `questionTimeLimit: 0` construido a mano: `toDomain`
+    // nunca produce 0 (normaliza a 20000), así que el 20000 persistido solo
+    // puede haberlo escrito el caso de uso.
+    const games = createInMemoryGameRepository([
+      gameFixture({ questionTimeLimit: 0 }),
+    ]);
     const updateSpy = vi.spyOn(games, "setStatusAndIndex");
     const useCase = createStartGameUseCase({ games, clock: fixedClock(NOW) });
 
     const updated = await useCase.execute({ gameId: "123456" });
 
-    // El patch es EXACTAMENTE el del legacy: sin `questionTimeLimit`.
+    // El patch es EXACTAMENTE el del legacy, con `questionTimeLimit` incluido.
     expect(updateSpy).toHaveBeenCalledWith("123456", {
       status: "active",
       currentQuestionIndex: 0,
       currentQuestionStartTime: NOW,
+      questionTimeLimit: DEFAULT_TIME_LIMIT_MS,
     });
     expect(updated).toMatchObject({
       id: "123456",
@@ -89,18 +95,29 @@ describe("core/application/use-cases/start-game", () => {
       status: "active",
       currentQuestionIndex: 0,
       currentQuestionStartTime: NOW,
+      questionTimeLimit: DEFAULT_TIME_LIMIT_MS,
     });
   });
 
-  it("conserva el questionTimeLimit ya definido en el dominio (30000)", async () => {
+  it("conserva y reescribe el questionTimeLimit ya definido en el dominio (30000)", async () => {
     const games = createInMemoryGameRepository([
       gameFixture({ questionTimeLimit: 30000 }),
     ]);
+    const updateSpy = vi.spyOn(games, "setStatusAndIndex");
     const useCase = createStartGameUseCase({ games, clock: fixedClock(NOW) });
 
     const updated = await useCase.execute({ gameId: "123456" });
 
+    expect(updateSpy).toHaveBeenCalledWith("123456", {
+      status: "active",
+      currentQuestionIndex: 0,
+      currentQuestionStartTime: NOW,
+      questionTimeLimit: 30000,
+    });
     expect(updated.questionTimeLimit).toBe(30000);
+    await expect(games.findById("123456")).resolves.toMatchObject({
+      questionTimeLimit: 30000,
+    });
   });
 
   it("una partida inexistente lanza NotFoundError 404", async () => {
