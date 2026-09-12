@@ -29,6 +29,9 @@ const adminMock = vi.hoisted(() => ({
 
 const timerMock = vi.hoisted(() => ({ timeLeft: 15000, isFinished: false }));
 const resultsCapture = vi.hoisted(() => ({ props: null as unknown }));
+const sonnerMock = vi.hoisted(() => ({ error: vi.fn() }));
+
+vi.mock("sonner", () => ({ toast: { error: sonnerMock.error } }));
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ gameId: "123456" }),
@@ -86,7 +89,6 @@ vi.mock("@/components/admin/AnswerChart", () => ({
 type FetchFunction = (input: string, init?: RequestInit) => Promise<Response>;
 
 let fetchMock: ReturnType<typeof vi.fn<FetchFunction>>;
-let alertSpy: ReturnType<typeof vi.spyOn>;
 
 const jsonResponse = (body: unknown, ok = true): Response =>
   ({ ok, json: async () => body }) as unknown as Response;
@@ -137,7 +139,7 @@ beforeEach(() => {
 
   fetchMock = vi.fn<FetchFunction>();
   vi.stubGlobal("fetch", fetchMock);
-  alertSpy = vi.spyOn(window, "alert").mockImplementation(() => undefined);
+  sonnerMock.error.mockClear();
 });
 
 afterEach(() => {
@@ -198,7 +200,7 @@ describe("AdminPage (caracterización US-14)", () => {
     fireEvent.click(screen.getByRole("button", { name: /¡COMENZAR!/ }));
 
     await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith("Failed to start game.")
+      expect(sonnerMock.error).toHaveBeenCalledWith("Failed to start game.")
     );
     expect(adminMock.emit).not.toHaveBeenCalled();
     expect(adminMock.setGameCalls).toEqual([]);
