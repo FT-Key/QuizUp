@@ -20,10 +20,13 @@ import type { Mock } from "vitest";
 import { GameForm } from "@/components/GameForm";
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }));
+const sonnerMock = vi.hoisted(() => ({ error: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
 }));
+
+vi.mock("sonner", () => ({ toast: { error: sonnerMock.error } }));
 
 type FetchFunction = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -31,7 +34,6 @@ const jsonResponse = (body: unknown, ok = true): Response =>
   ({ ok, json: async () => body }) as unknown as Response;
 
 let fetchMock: Mock<FetchFunction>;
-let alertSpy: ReturnType<typeof vi.spyOn>;
 let createObjectURL: Mock<(blob: Blob) => string>;
 let revokeObjectURL: Mock<(url: string) => void>;
 let capturedBlob: Blob | null;
@@ -83,7 +85,7 @@ beforeEach(() => {
   mocks.push.mockReset();
   fetchMock = vi.fn<FetchFunction>();
   vi.stubGlobal("fetch", fetchMock);
-  alertSpy = vi.spyOn(window, "alert").mockImplementation(() => undefined);
+  sonnerMock.error.mockClear();
 
   capturedBlob = null;
   clickedAnchor = null;
@@ -246,7 +248,7 @@ describe("GameForm (caracterización US-14)", () => {
     fireEvent.click(submitButton());
 
     await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith(
+      expect(sonnerMock.error).toHaveBeenCalledWith(
         "Failed to create game. Please try again."
       )
     );
@@ -263,7 +265,7 @@ describe("GameForm (caracterización US-14)", () => {
     fireEvent.click(submitButton());
 
     await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith(
+      expect(sonnerMock.error).toHaveBeenCalledWith(
         "Failed to create game. Please try again."
       )
     );
@@ -391,7 +393,7 @@ describe("GameForm (caracterización US-14)", () => {
     fireEvent.change(fileInput(container), { target: { files: [file] } });
 
     await waitFor(() =>
-      expect(alertSpy).toHaveBeenCalledWith(
+      expect(sonnerMock.error).toHaveBeenCalledWith(
         "Archivo .quizup inválido:\nEl archivo no es un JSON válido."
       )
     );
@@ -407,7 +409,7 @@ describe("GameForm (caracterización US-14)", () => {
 
     fireEvent.change(fileInput(container), { target: { files: [file] } });
 
-    expect(alertSpy).toHaveBeenCalledWith(
+    expect(sonnerMock.error).toHaveBeenCalledWith(
       "El archivo es demasiado grande. El máximo permitido es 2 MB."
     );
     expect(textSpy).not.toHaveBeenCalled();
