@@ -10,6 +10,27 @@ export function fixedClock(now: number): Clock {
   return { now: () => now };
 }
 
+/** Reloj mutable para tests que avanzan el tiempo entre llamadas. */
+export interface ManualClock {
+  clock: Clock;
+  set(now: number): void;
+  advance(ms: number): void;
+}
+
+/** Reloj controlable: `clock.now()` devuelve el valor vigente del contador. */
+export function manualClock(initial = 0): ManualClock {
+  let now = initial;
+  return {
+    clock: { now: () => now },
+    set: (value: number) => {
+      now = value;
+    },
+    advance: (ms: number) => {
+      now += ms;
+    },
+  };
+}
+
 /** Ids deterministas: `prefix-1`, `prefix-2`, ... (prefijo default `id`). */
 export function sequentialIds(prefix = "id"): IdGenerator {
   let counter = 0;

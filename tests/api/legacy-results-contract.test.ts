@@ -1,34 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GameResults } from "@/types";
+import {
+  toDomain,
+  type GameDoc,
+} from "@/adapters/persistence/mongo/game.mapper";
+import type { GameResults } from "@/core/domain/results/results-calculator";
+import {
+  createFakeContainer,
+  type FakeContainerOptions,
+} from "@/tests/fakes/container";
 
-// US-10: caracterización del contrato de éxito de `GET /api/games/[gameId]/results`
-// (pre-refactor). Congela el JSON exacto que hoy devuelve la ruta como referencia
-// de paridad para `core/domain/results/results-calculator.ts`.
+// US-10/US-12: caracterización del contrato de éxito de
+// `GET /api/games/[gameId]/results`. Congela el JSON exacto como referencia de
+// paridad para `core/domain/results/results-calculator.ts`.
 //
-// Sin Mongo ni red: se mockean `next/server`, `@/lib/mongoose` y `@/models/Game`,
-// siguiendo el patrón de `tests/api/legacy-error-contract.test.ts`.
-// Los casos de error (404/500) ya están congelados en ese archivo; acá solo se
-// caracteriza el cálculo de resultados sobre un documento `finished`.
+// Migración US-12: seam `vi.mock("@/infra/container")`; el seed pasa por
+// `toDomain(doc)` y el JSON de results queda intacto (incluye redondeo y
+// Map→Record). Los casos de error (404/500) están en
+// `legacy-error-contract.test.ts`.
 
-const { jsonMock, connectToDBMock, findOneMock } = vi.hoisted(() => ({
+const { jsonMock, getContainerMock } = vi.hoisted(() => ({
   jsonMock: vi.fn((body: unknown, init?: { status?: number }) => ({
     body,
     status: init?.status ?? 200,
   })),
-  connectToDBMock: vi.fn(async () => ({ connection: { readyState: 1 } })),
-  findOneMock: vi.fn(),
+  getContainerMock: vi.fn(),
 }));
 
 vi.mock("next/server", () => ({
   NextResponse: { json: jsonMock },
 }));
 
-vi.mock("@/lib/mongoose", () => ({
-  default: connectToDBMock,
-}));
-
-vi.mock("@/models/Game", () => ({
-  Game: { findOne: findOneMock },
+vi.mock("@/infra/container", () => ({
+  getContainer: getContainerMock,
 }));
 
 import { GET as getResults } from "../../app/api/games/[gameId]/results/route";
@@ -41,10 +44,12 @@ interface CapturedResponse {
 const GAME_PARAMS = { params: { gameId: "123456" } };
 const CREATED_AT = new Date("2026-01-15T12:00:00.000Z");
 
-async function callResults(
-  gameDoc: Record<string, unknown>
-): Promise<CapturedResponse> {
-  findOneMock.mockResolvedValue(gameDoc);
+function setupFake(options?: FakeContainerOptions): void {
+  getContainerMock.mockReturnValue(createFakeContainer(options).container);
+}
+
+async function callResults(gameDoc: GameDoc): Promise<CapturedResponse> {
+  setupFake({ seed: [toDomain(gameDoc)] });
   return (await getResults(
     {} as Request,
     GAME_PARAMS
@@ -52,10 +57,13 @@ async function callResults(
 }
 
 /** Documento de juego `finished` con los campos que la ruta no recibe por override. */
-function finishedGame(overrides: Record<string, unknown>) {
+function finishedGame(overrides: Partial<GameDoc>): GameDoc {
   return {
     gameCode: "123456",
+    name: "Geografía",
+    creatorId: "creator-1",
     status: "finished",
+    currentQuestionIndex: 0,
     createdAt: CREATED_AT,
     ...overrides,
   };
@@ -66,7 +74,7 @@ function mongoQuestion(id: string, text: string, correctAnswer: number) {
   return {
     _id: { toString: () => id },
     text,
-    options: ["A", "B", "C", "D"],
+    options: ["A", "B", "C", "D"] as [string, string, string, string],
     correctAnswer,
     image: null,
   };
@@ -105,8 +113,6 @@ describe("GET /api/games/[gameId]/results — cálculo de resultados (caracteriz
     );
 
     expect(response.status).toBe(200);
-    expect(connectToDBMock).toHaveBeenCalledTimes(1);
-    expect(findOneMock).toHaveBeenCalledWith({ gameCode: "123456" });
     // `score` (1500/900) es el puntaje persistido con bonus de tiempo del WS,
     // NO la cantidad de aciertos (2): el leaderboard debe reproducirlo tal cual.
     expect(response.body).toEqual({
@@ -167,7 +173,7 @@ describe("GET /api/games/[gameId]/results — cálculo de resultados (caracteriz
     const response = await callResults(
       finishedGame({
         players: [
-          // `score` ausente: el mapper aplica `p.score || 0`.
+          // `score` ausente: el dominio aplica `p.score || 0`.
           { id: "p1", name: "Ana", answers: { q1: 9, q2: 9 }, joinedAt: CREATED_AT },
           {
             id: "p2",
@@ -327,8 +333,8 @@ describe("GET /api/games/[gameId]/results — cálculo de resultados (caracteriz
       })
     );
 
-    // La ruta redondea `percentage` con Math.round; US-10 define que el dominio
-    // devuelve el porcentaje crudo y la capa REST/mapper redondea, como hoy.
+    // El dominio devuelve el porcentaje crudo y la capa REST/mapper redondea,
+    // como hoy (`toResultsDto`); `averageScore` NO se redondea.
     expect(response.body).toEqual({
       results: {
         gameId: "123456",
@@ -391,17 +397,17 @@ describe("GET /api/games/[gameId]/results — cálculo de resultados (caracteriz
   });
 
   it("sin jugadores: leaderboard vacío, averageScore 0 por `|| 1` y playerAnswers vacío", async () => {
-    // Sin `_id`: el id de pregunta cae a `q.id` (fallback del mapper).
+    // Sin `_id`: el id de pregunta cae a `q.id` (fallback D3 del mapper).
     const q1 = {
       id: "legacy-q1",
       text: "Pregunta 1",
-      options: ["A", "B", "C", "D"],
+      options: ["A", "B", "C", "D"] as [string, string, string, string],
       correctAnswer: 0,
     };
     const q2 = {
       id: "legacy-q2",
       text: "Pregunta 2",
-      options: ["A", "B", "C", "D"],
+      options: ["A", "B", "C", "D"] as [string, string, string, string],
       correctAnswer: 1,
     };
 

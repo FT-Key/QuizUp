@@ -8,6 +8,9 @@ import { connectToMongo } from "@/adapters/persistence/mongo/connection";
 import { createMongoGameRepository } from "@/adapters/persistence/mongo/game-repository.mongo";
 import { createSystemClock } from "@/adapters/system/clock";
 import { createUuidGenerator } from "@/adapters/system/id-generator";
+import { createInMemoryImageCache } from "@/adapters/unsplash/in-memory-image-cache.adapter";
+import { createInMemoryIpRateLimiter } from "@/adapters/unsplash/in-memory-ip-rate-limiter.adapter";
+import { createUnsplashSearchGateway } from "@/adapters/unsplash/unsplash-http.adapter";
 import {
   createCreateGameUseCase,
   type CreateGameUseCase,
@@ -33,6 +36,10 @@ import {
   type ListGamesUseCase,
 } from "@/core/application/use-cases/list-games";
 import {
+  createSearchImagesUseCase,
+  type SearchImagesUseCase,
+} from "@/core/application/use-cases/search-images";
+import {
   createStartGameUseCase,
   type StartGameUseCase,
 } from "@/core/application/use-cases/start-game";
@@ -51,6 +58,7 @@ export interface UseCases {
   readonly startGame: StartGameUseCase;
   readonly finishGame: FinishGameUseCase;
   readonly getResults: GetResultsUseCase;
+  readonly searchImages: SearchImagesUseCase;
 }
 
 /**
@@ -76,6 +84,16 @@ export function createContainer(config: AppConfig): Container {
   const games = createMongoGameRepository({
     connect: () => connectToMongo(config.mongoUri),
   });
+  // US-12: estado de Unsplash por instancia de container (caché, rate limit y
+  // cooldown sobreviven requests del proceso). La key solo vive en el adapter.
+  const imageSearchGateway = createUnsplashSearchGateway({
+    accessKey: config.unsplashAccessKey,
+    clock,
+    logger,
+    fetch,
+  });
+  const imageSearchCache = createInMemoryImageCache({ clock });
+  const ipRateLimiter = createInMemoryIpRateLimiter({ clock });
   const useCases: UseCases = {
     createGame: createCreateGameUseCase({ games, gameCodes, ids, clock }),
     listGames: createListGamesUseCase({ games }),
@@ -84,6 +102,11 @@ export function createContainer(config: AppConfig): Container {
     startGame: createStartGameUseCase({ games, clock }),
     finishGame: createFinishGameUseCase({ games }),
     getResults: createGetResultsUseCase({ games }),
+    searchImages: createSearchImagesUseCase({
+      gateway: imageSearchGateway,
+      cache: imageSearchCache,
+      rateLimiter: ipRateLimiter,
+    }),
   };
 
   return { logger, clock, ids, gameCodes, games, useCases };

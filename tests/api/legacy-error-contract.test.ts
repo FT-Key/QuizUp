@@ -1,55 +1,34 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
+import type { Game } from "@/core/domain/game";
+import type { Player } from "@/core/domain/player";
+import {
+  createFakeContainer,
+  type FakeContainerOptions,
+  type FakeContainerResult,
+} from "@/tests/fakes/container";
 
-// US-09: caracterización del contrato HTTP de errores legacy (pre-refactor).
-// Congela el shape `{ error: string }` y los status/mensajes exactos que las
-// rutas actuales devuelven, para que `error-mapper`/`next-response` de US-09
-// los respeten. Ninguna ruta toca Mongo real: `@/models/Game` y
-// `@/lib/mongoose` están mockeados.
+// US-09/US-12: caracterización del contrato HTTP de errores legacy. Congela el
+// shape `{ error: string }` y los status/mensajes exactos de cada ruta.
+//
+// Migración US-12: todas las rutas viven sobre `getContainer()` (seam
+// `vi.mock("@/infra/container")` + repo fake en memoria); los fallos 500 se
+// provocan espiando el método del repo (`vi.spyOn(fake.games, ...)`).
 
-const {
-  jsonMock,
-  connectToDBMock,
-  findOneMock,
-  createMock,
-  findMock,
-  uuidMock,
-  uniqueGameCodeMock,
-} = vi.hoisted(() => ({
+const { jsonMock, getContainerMock } = vi.hoisted(() => ({
   jsonMock: vi.fn((body: unknown, init?: { status?: number }) => ({
     body,
     status: init?.status ?? 200,
   })),
-  connectToDBMock: vi.fn(async () => ({ connection: { readyState: 1 } })),
-  findOneMock: vi.fn(),
-  createMock: vi.fn(),
-  findMock: vi.fn(),
-  uuidMock: vi.fn(() => "uuid-test-0001"),
-  uniqueGameCodeMock: vi.fn(async () => "123456"),
+  getContainerMock: vi.fn(),
 }));
 
 vi.mock("next/server", () => ({
   NextResponse: { json: jsonMock },
 }));
 
-vi.mock("@/lib/mongoose", () => ({
-  default: connectToDBMock,
-}));
-
-vi.mock("@/models/Game", () => ({
-  Game: {
-    findOne: findOneMock,
-    create: createMock,
-    find: findMock,
-  },
-}));
-
-vi.mock("uuid", () => ({
-  v4: uuidMock,
-}));
-
-vi.mock("@/lib/gameCode", () => ({
-  getUniqueGameCode: uniqueGameCodeMock,
+vi.mock("@/infra/container", () => ({
+  getContainer: getContainerMock,
 }));
 
 import { POST as createGame, GET as listGames } from "../../app/api/games/route";
@@ -95,15 +74,57 @@ const VALID_QUESTION = {
   correctAnswer: 0,
 };
 
-const SANITIZED_QUESTION = { ...VALID_QUESTION, image: null };
+const SANITIZED_QUESTION = {
+  ...VALID_QUESTION,
+  options: VALID_QUESTION.options as [string, string, string, string],
+  image: null,
+};
 
 const GAME_PARAMS = { params: { gameId: "123456" } };
 
+/** Partida de dominio para sembrar el repo fake de join. */
+function gameFixture(overrides: Partial<Game> = {}): Game {
+  return {
+    id: "123456",
+    name: "Geografía",
+    questions: [{ ...SANITIZED_QUESTION, id: "q-1" }],
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    creatorId: "creator-1",
+    status: "waiting",
+    currentQuestionIndex: 0,
+    players: [],
+    currentQuestionStartTime: 0,
+    questionTimeLimit: 20000,
+    locked: false,
+    ...overrides,
+  };
+}
+
+function playerFixture(overrides: Partial<Player> = {}): Player {
+  return {
+    id: "p0",
+    name: "Alice",
+    gameId: "123456",
+    answers: {},
+    score: 0,
+    joinedAt: new Date("2026-01-01T00:00:00.000Z"),
+    ...overrides,
+  };
+}
+
 describe("contrato HTTP de errores legacy", () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let fake: FakeContainerResult;
+
+  function setupFake(options?: FakeContainerOptions): FakeContainerResult {
+    fake = createFakeContainer(options);
+    getContainerMock.mockReturnValue(fake.container);
+    return fake;
+  }
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setupFake();
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -137,19 +158,7 @@ describe("contrato HTTP de errores legacy", () => {
       );
     });
 
-    it("una creación válida responde 201 con el DTO y usa gameCode + límite por defecto", async () => {
-      const createdAt = new Date("2026-01-01T00:00:00.000Z");
-      const gameDoc = {
-        gameCode: "123456",
-        name: "Geografía",
-        questions: [SANITIZED_QUESTION],
-        creatorId: "uuid-test-0001",
-        status: "waiting",
-        currentQuestionIndex: 0,
-        createdAt,
-      };
-      createMock.mockResolvedValue(gameDoc);
-
+    it("una creación válida responde 201 con el DTO normalizado (D1) y persiste gameCode + límite por defecto", async () => {
       const response = await capture(
         createGame(fakeRequest({ name: "Geografía", questions: [VALID_QUESTION] }))
       );
@@ -159,24 +168,34 @@ describe("contrato HTTP de errores legacy", () => {
         game: {
           id: "123456",
           name: "Geografía",
-          questions: [SANITIZED_QUESTION],
-          creatorId: "uuid-test-0001",
+          // D1 (US-11): preguntas normalizadas con el id sintético del repo.
+          questions: [{ ...SANITIZED_QUESTION, id: "q-1" }],
+          creatorId: "id-1",
           status: "waiting",
           currentQuestionIndex: 0,
-          createdAt,
+          createdAt: new Date(0),
         },
       });
-      expect(createMock).toHaveBeenCalledWith({
+
+      // Seam: lo que el legacy pasaba a `Game.create` ahora se lee del repo fake.
+      await expect(fake.games.findById("123456")).resolves.toMatchObject({
         name: "Geografía",
-        gameCode: "123456",
-        questions: [SANITIZED_QUESTION],
-        creatorId: "uuid-test-0001",
+        questions: [
+          {
+            id: "q-1",
+            text: VALID_QUESTION.text,
+            options: VALID_QUESTION.options,
+            correctAnswer: 0,
+            image: null,
+          },
+        ],
+        creatorId: "id-1",
         questionTimeLimit: 20000,
       });
     });
 
     it("si la creación falla responde 500 Internal server error", async () => {
-      createMock.mockRejectedValue(new Error("fallo de mongo"));
+      vi.spyOn(fake.games, "create").mockRejectedValue(new Error("fallo de mongo"));
 
       await expectErrorResponse(
         createGame(fakeRequest({ name: "Geografía", questions: [VALID_QUESTION] })),
@@ -189,16 +208,23 @@ describe("contrato HTTP de errores legacy", () => {
   describe("GET /api/games", () => {
     it("lista los juegos mapeando id = gameCode", async () => {
       const createdAt = new Date("2026-01-02T00:00:00.000Z");
-      const gameDoc = {
-        gameCode: "654321",
-        name: "Historia",
-        questions: [SANITIZED_QUESTION],
-        creatorId: "creator-1",
-        status: "waiting",
-        currentQuestionIndex: 0,
-        createdAt,
-      };
-      findMock.mockReturnValue({ sort: vi.fn(async () => [gameDoc]) });
+      setupFake({
+        seed: [
+          {
+            id: "654321",
+            name: "Historia",
+            questions: [{ ...SANITIZED_QUESTION, id: "q-1" }],
+            createdAt,
+            creatorId: "creator-1",
+            status: "waiting",
+            currentQuestionIndex: 0,
+            players: [],
+            currentQuestionStartTime: 0,
+            questionTimeLimit: 20000,
+            locked: false,
+          },
+        ],
+      });
 
       const response = await capture(listGames());
 
@@ -208,7 +234,7 @@ describe("contrato HTTP de errores legacy", () => {
           {
             id: "654321",
             name: "Historia",
-            questions: [SANITIZED_QUESTION],
+            questions: [{ ...SANITIZED_QUESTION, id: "q-1" }],
             creatorId: "creator-1",
             status: "waiting",
             currentQuestionIndex: 0,
@@ -219,9 +245,7 @@ describe("contrato HTTP de errores legacy", () => {
     });
 
     it("si la consulta falla responde 500 Internal server error", async () => {
-      findMock.mockImplementation(() => {
-        throw new Error("fallo de mongo");
-      });
+      vi.spyOn(fake.games, "listRecent").mockRejectedValue(new Error("fallo de mongo"));
 
       await expectErrorResponse(listGames(), 500, "Internal server error");
     });
@@ -247,8 +271,6 @@ describe("contrato HTTP de errores legacy", () => {
     });
 
     it("una partida inexistente responde 404 Game not found", async () => {
-      findOneMock.mockResolvedValue(null);
-
       await expectErrorResponse(
         joinGame(fakeRequest({ gameId: "000000", playerName: "Alice" })),
         404,
@@ -257,7 +279,7 @@ describe("contrato HTTP de errores legacy", () => {
     });
 
     it("una partida que no está waiting responde 400 Game is no longer accepting players", async () => {
-      findOneMock.mockResolvedValue({ status: "active" });
+      setupFake({ seed: [gameFixture({ status: "active" })] });
 
       await expectErrorResponse(
         joinGame(fakeRequest({ gameId: "123456", playerName: "Alice" })),
@@ -267,7 +289,7 @@ describe("contrato HTTP de errores legacy", () => {
     });
 
     it("una partida locked responde 403 Game entry is locked", async () => {
-      findOneMock.mockResolvedValue({ status: "waiting", locked: true });
+      setupFake({ seed: [gameFixture({ locked: true })] });
 
       await expectErrorResponse(
         joinGame(fakeRequest({ gameId: "123456", playerName: "Alice" })),
@@ -277,11 +299,7 @@ describe("contrato HTTP de errores legacy", () => {
     });
 
     it("un nombre ya tomado se detecta sin distinguir mayúsculas y responde 400", async () => {
-      findOneMock.mockResolvedValue({
-        status: "waiting",
-        locked: false,
-        players: [{ name: "Alice" }],
-      });
+      setupFake({ seed: [gameFixture({ players: [playerFixture()] })] });
 
       await expectErrorResponse(
         joinGame(fakeRequest({ gameId: "123456", playerName: "aLiCe" })),
@@ -291,7 +309,7 @@ describe("contrato HTTP de errores legacy", () => {
     });
 
     it("un fallo inesperado de la consulta responde 500 Internal server error", async () => {
-      findOneMock.mockRejectedValue(new Error("fallo de mongo"));
+      vi.spyOn(fake.games, "findById").mockRejectedValue(new Error("fallo de mongo"));
 
       await expectErrorResponse(
         joinGame(fakeRequest({ gameId: "123456", playerName: "Alice" })),
@@ -301,18 +319,7 @@ describe("contrato HTTP de errores legacy", () => {
     });
 
     it("un join válido responde 200 y agrega al jugador con avatar por defecto", async () => {
-      const game = {
-        gameCode: "123456",
-        name: "Geografía",
-        questions: [SANITIZED_QUESTION],
-        creatorId: "creator-1",
-        status: "waiting",
-        currentQuestionIndex: 0,
-        createdAt: new Date("2026-01-01T00:00:00.000Z"),
-        players: [] as Array<Record<string, unknown>>,
-        save: vi.fn(async () => game),
-      };
-      findOneMock.mockResolvedValue(game);
+      setupFake({ seed: [gameFixture()] });
 
       const response = await capture(
         joinGame(fakeRequest({ gameId: "123456", playerName: "Alice" }))
@@ -320,7 +327,8 @@ describe("contrato HTTP de errores legacy", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.player).toEqual({
-        id: "uuid-test-0001",
+        // D1 (US-11 §2.1): ids sintéticos deterministas del fake (reemplazan uuid).
+        id: "id-1",
         name: "Alice",
         gameId: "123456",
         answers: {},
@@ -332,7 +340,7 @@ describe("contrato HTTP de errores legacy", () => {
         id: "123456",
         players: [
           {
-            id: "uuid-test-0001",
+            id: "id-1",
             name: "Alice",
             gameId: "123456",
             answers: {},
@@ -341,20 +349,27 @@ describe("contrato HTTP de errores legacy", () => {
           },
         ],
       });
-      expect(game.save).toHaveBeenCalledTimes(1);
-      expect(game.players).toHaveLength(1);
+      // Efecto persistido: el repo fake tiene al jugador (antes: `game.save`).
+      const stored = await fake.games.findById("123456");
+      expect(stored?.players).toHaveLength(1);
+      expect(stored?.players[0]).toMatchObject({
+        id: "id-1",
+        name: "Alice",
+        gameId: "123456",
+        answers: {},
+        score: 0,
+        avatar: { seed: "Alice" },
+      });
     });
   });
 
   describe("GET /api/games/[gameId]", () => {
     it("una partida inexistente responde 404 Game not found", async () => {
-      findOneMock.mockResolvedValue(null);
-
       await expectErrorResponse(getGame({} as Request, GAME_PARAMS), 404, "Game not found");
     });
 
     it("un fallo inesperado de la consulta responde 500 Internal server error", async () => {
-      findOneMock.mockRejectedValue(new Error("fallo de mongo"));
+      vi.spyOn(fake.games, "findById").mockRejectedValue(new Error("fallo de mongo"));
 
       await expectErrorResponse(
         getGame({} as Request, GAME_PARAMS),
@@ -366,8 +381,6 @@ describe("contrato HTTP de errores legacy", () => {
 
   describe("GET /api/games/[gameId]/results", () => {
     it("una partida inexistente responde 404 Game not found or no results available", async () => {
-      findOneMock.mockResolvedValue(null);
-
       await expectErrorResponse(
         getResults({} as Request, GAME_PARAMS),
         404,
@@ -376,7 +389,7 @@ describe("contrato HTTP de errores legacy", () => {
     });
 
     it("una partida que no está finished responde 404 Game not found or no results available", async () => {
-      findOneMock.mockResolvedValue({ status: "active" });
+      setupFake({ seed: [gameFixture({ status: "active" })] });
 
       await expectErrorResponse(
         getResults({} as Request, GAME_PARAMS),
@@ -386,7 +399,7 @@ describe("contrato HTTP de errores legacy", () => {
     });
 
     it("un fallo inesperado de la consulta responde 500 Internal server error", async () => {
-      findOneMock.mockRejectedValue(new Error("fallo de mongo"));
+      vi.spyOn(fake.games, "findById").mockRejectedValue(new Error("fallo de mongo"));
 
       await expectErrorResponse(
         getResults({} as Request, GAME_PARAMS),

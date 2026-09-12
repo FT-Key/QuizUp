@@ -1,92 +1,25 @@
 import { type NextRequest, NextResponse } from "next/server";
-import connectToDB from "@/lib/mongoose";
-import { Game } from "@/models/Game";
-import type { JoinGameData, Player } from "@/types";
-import { v4 as uuidv4 } from "uuid";
+import { toJoinGameDto, toPlayerDto } from "@/adapters/persistence/mongo/game.mapper";
+import { handle } from "@/adapters/http/handle";
+import { error, ok } from "@/adapters/http/next-response";
+import { parseJoinGameBody } from "@/adapters/http/schemas/join-game.schema";
+import { GameLockedError } from "@/core/domain/errors";
+import { getContainer } from "@/infra/container";
 
-export async function POST(request: NextRequest) {
-  try {
-    await connectToDB();
-
-    const data: JoinGameData = await request.json();
-
-    if (!data.gameId || !data.playerName) {
-      return NextResponse.json(
-        { error: "Game ID and player name are required" },
-        { status: 400 }
-      );
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  return handle(async () => {
+    // `await request.json()` NO se captura: body no-JSON → handle → 500 (asimetría legacy).
+    const body = parseJoinGameBody(await request.json());
+    try {
+      const { player, game } = await getContainer().useCases.joinGame.execute({
+        gameId: body.gameId ?? "",
+        playerName: body.playerName ?? "",
+        avatar: body.avatar,
+      });
+      return ok({ player: toPlayerDto(player), game: toJoinGameDto(game) });
+    } catch (cause) {
+      if (cause instanceof GameLockedError) return error(cause, 403);
+      throw cause;
     }
-
-    const game = await Game.findOne({ gameCode: data.gameId });
-    if (!game) {
-      return NextResponse.json({ error: "Game not found" }, { status: 404 });
-    }
-
-    if (game.status !== "waiting") {
-      return NextResponse.json(
-        { error: "Game is no longer accepting players" },
-        { status: 400 }
-      );
-    }
-
-    if (game.locked) {
-      return NextResponse.json(
-        { error: "Game entry is locked" },
-        { status: 403 }
-      );
-    }
-
-    const existingPlayer = (game.players as Player[]).find(
-      (p) => p.name.toLowerCase() === data.playerName.toLowerCase()
-    );
-    if (existingPlayer) {
-      return NextResponse.json(
-        { error: "Player name is already taken in this game" },
-        { status: 400 }
-      );
-    }
-
-    const newPlayer: Player = {
-      id: uuidv4(),
-      name: data.playerName,
-      gameId: game.gameCode,
-      answers: {},
-      score: 0,
-      joinedAt: new Date(),
-      avatar: data.avatar || { seed: data.playerName },
-    };
-
-    game.players.push(newPlayer);
-    await game.save();
-
-    const gameForFrontend = {
-      id: game.gameCode,
-      name: game.name,
-      questions: game.questions,
-      creatorId: game.creatorId,
-      status: game.status,
-      currentQuestionIndex: game.currentQuestionIndex,
-      createdAt: game.createdAt,
-      players: (game.players as Player[]).map((p) => ({
-        id: p.id,
-        name: p.name,
-        gameId: p.gameId,
-        answers: p.answers,
-        score: p.score,
-        joinedAt: p.joinedAt,
-        avatar: p.avatar,
-      })),
-    };
-
-    return NextResponse.json(
-      { player: newPlayer, game: gameForFrontend },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Error joining game:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  }, "Error joining game:");
 }

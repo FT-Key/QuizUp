@@ -2,6 +2,7 @@ import type { Game } from "../../domain/game";
 import type { Player, PlayerAvatar } from "../../domain/player";
 import {
   ConflictError,
+  GameLockedError,
   NotFoundError,
   ValidationError,
 } from "../../domain/errors";
@@ -51,7 +52,7 @@ export function createJoinGameUseCase(deps: JoinGameDeps): JoinGameUseCase {
       }
 
       if (game.locked) {
-        throw new ConflictError("Game entry is locked");
+        throw new GameLockedError("Game entry is locked");
       }
 
       const normalizedName = input.playerName.toLowerCase();

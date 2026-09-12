@@ -3,8 +3,12 @@ import type { DomainError } from "@/core/domain/errors";
 import { toHttpError } from "./error-mapper";
 
 /** Respuesta OK con el shape tal cual del contrato (200 por defecto). */
-export function ok<T>(data: T, status = 200): NextResponse {
-  return NextResponse.json(data, { status });
+export function ok<T>(
+  data: T,
+  status = 200,
+  headers?: Record<string, string>
+): NextResponse {
+  return NextResponse.json(data, { status, headers });
 }
 
 /** Respuesta de error con shape exacto `{ error: string }`. */

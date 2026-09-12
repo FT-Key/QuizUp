@@ -1,41 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
+import {
+  toDomain,
+  type GameDoc,
+} from "@/adapters/persistence/mongo/game.mapper";
+import {
+  createFakeContainer,
+  type FakeContainerOptions,
+  type FakeContainerResult,
+} from "@/tests/fakes/container";
 
-// US-11: caracterización de los DTOs legacy de `GET /api/games/[gameId]` y
-// `POST /api/games/join` (pre-refactor). Congela el JSON exacto que hoy
-// devuelven las rutas como referencia de paridad para `toGameDto` /
-// `GameRepository` de US-11 (AS-17: mapeo documento→DTO duplicado, con shapes
-// distintos por ruta).
+// US-11/US-12: caracterización de los DTOs legacy de `GET /api/games/[gameId]`
+// y `POST /api/games/join`. Congela el JSON exacto como referencia de paridad
+// para `toGameDto` / `GameRepository`.
 //
-// Sin Mongo ni red: se mockean `next/server` (capturando el body ANTES de que
-// Next lo serialice), `@/lib/mongoose`, `@/models/Game` y `uuid`, siguiendo el
-// patrón de `tests/api/legacy-error-contract.test.ts`. Los errores (400/403/404/500)
-// de ambas rutas ya están congelados allí; acá solo se caracteriza el happy path.
+// Migración US-12: ambas rutas viven sobre `getContainer()` (seam
+// `vi.mock("@/infra/container")` + repo fake); los bloques D1/D2/D3 reflejan las
+// desviaciones aprobadas de US-11.
 
-const { jsonMock, connectToDBMock, findOneMock, uuidMock } = vi.hoisted(() => ({
+const { jsonMock, getContainerMock } = vi.hoisted(() => ({
   jsonMock: vi.fn((body: unknown, init?: { status?: number }) => ({
     body,
     status: init?.status ?? 200,
   })),
-  connectToDBMock: vi.fn(async () => ({ connection: { readyState: 1 } })),
-  findOneMock: vi.fn(),
-  uuidMock: vi.fn(() => "uuid-test-0001"),
+  getContainerMock: vi.fn(),
 }));
 
 vi.mock("next/server", () => ({
   NextResponse: { json: jsonMock },
 }));
 
-vi.mock("@/lib/mongoose", () => ({
-  default: connectToDBMock,
-}));
-
-vi.mock("@/models/Game", () => ({
-  Game: { findOne: findOneMock },
-}));
-
-vi.mock("uuid", () => ({
-  v4: uuidMock,
+vi.mock("@/infra/container", () => ({
+  getContainer: getContainerMock,
 }));
 
 import { GET as getGame } from "../../app/api/games/[gameId]/route";
@@ -60,7 +56,7 @@ function mongoQuestion(id: string, text: string, correctAnswer: number) {
   return {
     _id: { toString: () => id },
     text,
-    options: ["A", "B", "C", "D"],
+    options: ["A", "B", "C", "D"] as [string, string, string, string],
     correctAnswer,
     image: null,
   };
@@ -70,30 +66,44 @@ const GAME_PARAMS = { params: { gameId: "123456" } };
 const CREATED_AT = new Date("2026-01-15T12:00:00.000Z");
 const JOINED_AT = new Date("2026-01-15T12:05:00.000Z");
 
+let fake: FakeContainerResult;
+
+function setupFake(options?: FakeContainerOptions): FakeContainerResult {
+  fake = createFakeContainer(options);
+  getContainerMock.mockReturnValue(fake.container);
+  return fake;
+}
+
 describe("GET /api/games/[gameId] — DTO de game (caracterización US-11)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setupFake();
   });
 
   it("mapea preguntas y jugadores con los fallbacks exactos del mapper legacy", async () => {
     const q1 = {
       _id: { toString: () => "q1" },
       text: "¿Cuál es la capital de Francia?",
-      options: ["París", "Londres", "Berlín", "Madrid"],
+      options: ["París", "Londres", "Berlín", "Madrid"] as [
+        string,
+        string,
+        string,
+        string
+      ],
       correctAnswer: 2,
       image: { url: "https://img.test/francia.png", thumb: "https://img.test/francia-thumb.png" },
     };
-    // Sin `_id` pero con `id`: el mapper de ESTA ruta NO cae a `q.id`
-    // (asimetría legacy con /results, que usa `q._id?.toString() || q.id || ""`).
+    // Sin `_id` pero con `id`: D3 (US-11) unifica el fallback `_id → id → ""`
+    // (el legacy de esta ruta ignoraba `q.id` y emitía "").
     const q2 = {
       id: "legacy-q2",
       text: "¿Cuánto es 2 + 2?",
-      options: ["3", "4", "5", "6"],
+      options: ["3", "4", "5", "6"] as [string, string, string, string],
       correctAnswer: 1,
-      // sin `image`: la ruta aplica `q.image ?? null`.
+      // sin `image`: el mapper aplica `q.image ?? null`.
     };
 
-    const gameDoc = {
+    const gameDoc: GameDoc = {
       gameCode: "123456",
       name: "Geografía",
       questions: [q1, q2],
@@ -114,17 +124,15 @@ describe("GET /api/games/[gameId] — DTO de game (caracterización US-11)", () 
           joinedAt: JOINED_AT,
           avatar: { seed: "ana", accessories: ["hat"] },
         },
-        // Sin `answers`/`score`/`avatar`: la ruta aplica `{}`, `0` y `undefined`.
+        // Sin `answers`/`score`/`avatar`: el dominio aplica `{}`, `0` y `undefined`.
         { id: "p2", name: "Beto", gameId: "game-id-viejo", joinedAt: JOINED_AT },
       ],
     };
-    findOneMock.mockResolvedValue(gameDoc);
+    setupFake({ seed: [toDomain(gameDoc)] });
 
     const response = await capture(getGame({} as Request, GAME_PARAMS));
 
     expect(response.status).toBe(200);
-    expect(connectToDBMock).toHaveBeenCalledTimes(1);
-    expect(findOneMock).toHaveBeenCalledWith({ gameCode: "123456" });
     expect(response.body).toEqual({
       game: {
         id: "123456",
@@ -138,8 +146,9 @@ describe("GET /api/games/[gameId] — DTO de game (caracterización US-11)", () 
             image: q1.image,
           },
           {
-            // CARACTERIZACIÓN: sin `_id` el id sale ""; `q.id` se ignora.
-            id: "",
+            // D3 (US-11 §10): fallback unificado `_id → id → ""`; con `id`
+            // presente sale "legacy-q2" (el legacy sintético daba "").
+            id: "legacy-q2",
             text: q2.text,
             options: q2.options,
             correctAnswer: 1,
@@ -214,14 +223,15 @@ describe("GET /api/games/[gameId] — DTO de game (caracterización US-11)", () 
   it("un doc sin campos opcionales cae a 0 / 20000 / false y los arrays ausentes quedan vacíos", async () => {
     // Doc mínimo: sin currentQuestionStartTime, questionTimeLimit, locked,
     // questions ni players.
-    findOneMock.mockResolvedValue({
+    const gameDoc: GameDoc = {
       gameCode: "123456",
       name: "Vacío",
       creatorId: "creator-1",
       status: "waiting",
       currentQuestionIndex: 0,
       createdAt: CREATED_AT,
-    });
+    };
+    setupFake({ seed: [toDomain(gameDoc)] });
 
     const response = await capture(getGame({} as Request, GAME_PARAMS));
 
@@ -246,10 +256,10 @@ describe("GET /api/games/[gameId] — DTO de game (caracterización US-11)", () 
     });
   });
 
-  it("answers como Map nativo se pasa tal cual y solo se aplana al serializar si es MongooseMap", async () => {
+  it("answers como Map de Mongoose se normaliza a Record en el DTO (mapper único)", async () => {
     const answersMap = new Map<string, number>([["q1", 2]]);
     const q1 = mongoQuestion("q1", "¿Cuál es la capital de Francia?", 2);
-    findOneMock.mockResolvedValue({
+    const gameDoc: GameDoc = {
       gameCode: "123456",
       name: "Geografía",
       questions: [q1],
@@ -267,24 +277,17 @@ describe("GET /api/games/[gameId] — DTO de game (caracterización US-11)", () 
           joinedAt: JOINED_AT,
         },
       ],
-    });
+    };
+    setupFake({ seed: [toDomain(gameDoc)] });
 
     const response = await capture(getGame({} as Request, GAME_PARAMS));
 
-    // La ruta NO normaliza `answers` (a diferencia de /results, que sí hace
-    // `p.answers instanceof Map → for..of`): el capturador recibe la MISMA
-    // referencia del Map.
-    expect(response.body.game.players[0].answers).toBe(answersMap);
-
-    // Decisión de caracterización: se fija además el comportamiento observable
-    // con un Map nativo (el fake de este test): JSON.stringify(new Map()) === "{}"
-    // porque un Map no tiene `toJSON`. En runtime real Mongoose hidrata `answers`
-    // como MongooseMap, que sí define `toJSON()` (mongoose/lib/types/map.js) y lo
-    // aplana por defecto a `{ q1: 2 }`: el JSON HTTP real lleva las respuestas.
-    // Por eso el mapper de US-11 debe convertir Map→Record explícitamente (como
-    // /results) y NUNCA hacer spread de un Map (daría `{}` incluso con MongooseMap).
-    expect(JSON.parse(JSON.stringify(response.body)).game.players[0].answers).toEqual({});
-    expect(JSON.parse(JSON.stringify(response.body)).game.players[0].score).toBe(500);
+    // El mapper de US-11 convierte Map→Record explícitamente (como /results):
+    // el DTO emite un objeto plano con las respuestas, nunca la referencia del
+    // Map (la conversión Map→Record tiene su test en `game.mapper.test.ts`).
+    expect(response.body.game.players[0].answers).toEqual({ q1: 2 });
+    expect(response.body.game.players[0].answers).not.toBe(answersMap);
+    expect(response.body.game.players[0].score).toBe(500);
   });
 });
 
@@ -293,9 +296,9 @@ describe("POST /api/games/join — DTO de éxito (caracterización US-11)", () =
     vi.clearAllMocks();
   });
 
-  /** Doc `waiting` listo para aceptar jugadores; `players` se puede pre-poblar. */
-  function joinableGame(players: Array<Record<string, unknown>> = []) {
-    const game = {
+  /** Doc Mongo `waiting`; el seed pasa por `toDomain` (D2/D3 del mapper). */
+  function joinableDoc(players: GameDoc["players"] = []): GameDoc {
+    return {
       gameCode: "123456",
       name: "Geografía",
       questions: [
@@ -312,34 +315,42 @@ describe("POST /api/games/join — DTO de éxito (caracterización US-11)", () =
       currentQuestionIndex: 0,
       createdAt: CREATED_AT,
       players,
-      save: vi.fn(async () => game),
     };
-    return game;
   }
 
-  it("un avatar provisto por el cliente se respeta y `questions` se devuelve sin mapear", async () => {
-    const game = joinableGame();
+  it("un avatar provisto por el cliente se respeta y `questions` se devuelve normalizada (D1)", async () => {
     const avatar = { seed: "custom", accessories: ["glasses"] };
-    findOneMock.mockResolvedValue(game);
+    setupFake({ seed: [toDomain(joinableDoc())] });
 
     const response = await capture(
       joinGame(fakeRequest({ gameId: "123456", playerName: "Alice", avatar }))
     );
 
     expect(response.status).toBe(200);
-    // Misma referencia: la ruta no clona el avatar ni aplica el default `{ seed: name }`.
-    expect(response.body.player.avatar).toBe(avatar);
-    // `questions: game.questions`: el DTO de join NO mapea las preguntas
-    // (conserva `_id`), a diferencia de GET /[gameId] y /start.
-    expect(response.body.game.questions).toBe(game.questions);
-    expect(response.body.game.questions[0]).toHaveProperty("_id");
-    expect(response.body.game.questions[0]).not.toHaveProperty("id");
-    expect(game.save).toHaveBeenCalledTimes(1);
+    // Mismo contenido: la ruta no aplica el default `{ seed: name }`. A
+    // diferencia del legacy, `parseJoinGameBody` (Zod) entrega un clon
+    // estructural del avatar; la identidad de referencia no es observable por
+    // HTTP y el JSON es idéntico.
+    expect(response.body.player.avatar).toEqual(avatar);
+    // D1 (US-11): el DTO normaliza las preguntas a `{ id, text, options,
+    // correctAnswer, image }`, sin `_id` (el legacy hacía pass-through).
+    expect(response.body.game.questions).toEqual([
+      {
+        id: "q1",
+        text: "¿Cuál es la capital de Francia?",
+        options: ["París", "Londres", "Berlín", "Madrid"],
+        correctAnswer: 0,
+        image: null,
+      },
+    ]);
+    expect(response.body.game.questions[0]).not.toHaveProperty("_id");
+    // Efecto persistido: el repo fake tiene al jugador (antes: `game.save`).
+    const stored = await fake.games.findById("123456");
+    expect(stored?.players).toHaveLength(1);
   });
 
   it("sin avatar usa el default `{ seed: playerName }` y las claves del DTO son exactas", async () => {
-    const game = joinableGame();
-    findOneMock.mockResolvedValue(game);
+    setupFake({ seed: [toDomain(joinableDoc())] });
 
     const response = await capture(
       joinGame(fakeRequest({ gameId: "123456", playerName: "Alice" }))
@@ -374,12 +385,18 @@ describe("POST /api/games/join — DTO de éxito (caracterización US-11)", () =
     expect(response.body.game).not.toHaveProperty("locked");
   });
 
-  it("un jugador preexistente del doc NO recibe los fallbacks ni el gameId del DTO de GET", async () => {
-    const game = joinableGame([
-      // Sin answers/score/avatar y con un gameId que no coincide con el gameCode.
-      { id: "p0", name: "Zoe", gameId: "codigo-viejo", joinedAt: JOINED_AT },
-    ]);
-    findOneMock.mockResolvedValue(game);
+  it("un jugador preexistente incompleto recibe los fallbacks D2 (incluido el gameId del código)", async () => {
+    setupFake({
+      seed: [
+        toDomain(
+          joinableDoc([
+            // Sin answers/score/avatar y con un gameId que no coincide con el gameCode:
+            // `toDomain` normaliza con los fallbacks D2.
+            { id: "p0", name: "Zoe", gameId: "codigo-viejo", joinedAt: JOINED_AT },
+          ])
+        ),
+      ],
+    });
 
     const response = await capture(
       joinGame(fakeRequest({ gameId: "123456", playerName: "Alice" }))
@@ -389,8 +406,9 @@ describe("POST /api/games/join — DTO de éxito (caracterización US-11)", () =
     expect(response.body.game.players).toHaveLength(2);
 
     const zoe = response.body.game.players[0];
-    // El DTO de join pasa los campos tal cual (sin `|| {}` / `|| 0` / `|| undefined`):
-    // las claves existen con valor `undefined`.
+    // D2 (US-11 §10): el mapper unificado normaliza al jugador preexistente
+    // (`answers {}`, `score 0`, `gameId` = gameCode, `avatar` undefined) en vez
+    // del pass-through legacy que emitía claves `undefined` y el gameId viejo.
     expect(Object.keys(zoe).sort()).toEqual([
       "answers",
       "avatar",
@@ -400,15 +418,15 @@ describe("POST /api/games/join — DTO de éxito (caracterización US-11)", () =
       "name",
       "score",
     ]);
-    expect(zoe.answers).toBeUndefined();
-    expect(zoe.score).toBeUndefined();
+    expect(zoe.answers).toEqual({});
+    expect(zoe.score).toBe(0);
     expect(zoe.avatar).toBeUndefined();
-    // Tampoco sobreescribe `gameId` con el gameCode (a diferencia de GET /[gameId]).
-    expect(zoe.gameId).toBe("codigo-viejo");
+    expect(zoe.gameId).toBe("123456");
 
     const alice = response.body.game.players[1];
     expect(alice).toMatchObject({
-      id: "uuid-test-0001",
+      // D1: id sintético del fake (reemplaza el uuid legacy).
+      id: "id-1",
       name: "Alice",
       gameId: "123456",
       answers: {},

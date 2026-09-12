@@ -2,36 +2,43 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Game } from "@/core/domain/game";
 import type { GameResults } from "@/core/domain/results/results-calculator";
 import { calculateResults } from "@/core/domain/results/results-calculator";
+import {
+  toDomain,
+  toResultsDto,
+  type GameDoc,
+} from "@/adapters/persistence/mongo/game.mapper";
 import { ResultsBuilder, questionFixture } from "@/tests/builders/results-builder";
+import {
+  createFakeContainer,
+  type FakeContainerOptions,
+} from "@/tests/fakes/container";
 
-// US-10: paridad route-vivo vs dominio-vivo.
+// US-10/US-12: paridad route-vivo vs dominio-vivo.
 //
 // Espejo 1:1 de `tests/api/legacy-results-contract.test.ts` (9 casos), que
-// congela la respuesta exacta de la ruta. Acá se ejecuta la ruta real mockeada
-// (sin modificarla, prohibido en esta US) y se compara contra
-// `calculateResults` + el único cambio de presentación de la ruta:
-// `Math.round` sobre `percentage`. Si cualquiera de los dos lados cambia de
-// números o shape, el test falla sin copiar JSONs esperados.
+// congela la respuesta exacta de la ruta. Acá se ejecuta la ruta real sobre el
+// repo fake (`getContainer`) y se compara contra `calculateResults` + el único
+// cambio de presentación: `toResultsDto` (`Math.round` sobre `percentage`). Si
+// cualquiera de los dos lados cambia de números o shape, el test falla sin
+// copiar JSONs esperados.
+//
+// Migración US-12 (U9): el seed pasa por `toDomain` (incluye Map→Record) y ya no
+// se mockea la ruta legacy.
 
-const { jsonMock, connectToDBMock, findOneMock } = vi.hoisted(() => ({
+const { jsonMock, getContainerMock } = vi.hoisted(() => ({
   jsonMock: vi.fn((body: unknown, init?: { status?: number }) => ({
     body,
     status: init?.status ?? 200,
   })),
-  connectToDBMock: vi.fn(async () => ({ connection: { readyState: 1 } })),
-  findOneMock: vi.fn(),
+  getContainerMock: vi.fn(),
 }));
 
 vi.mock("next/server", () => ({
   NextResponse: { json: jsonMock },
 }));
 
-vi.mock("@/lib/mongoose", () => ({
-  default: connectToDBMock,
-}));
-
-vi.mock("@/models/Game", () => ({
-  Game: { findOne: findOneMock },
+vi.mock("@/infra/container", () => ({
+  getContainer: getContainerMock,
 }));
 
 import { GET as getResults } from "../../app/api/games/[gameId]/results/route";
@@ -44,10 +51,12 @@ interface CapturedResponse {
 const GAME_PARAMS = { params: { gameId: "123456" } };
 const CREATED_AT = new Date("2026-01-15T12:00:00.000Z");
 
-async function callResults(
-  gameDoc: Record<string, unknown>
-): Promise<CapturedResponse> {
-  findOneMock.mockResolvedValue(gameDoc);
+function setupFake(options?: FakeContainerOptions): void {
+  getContainerMock.mockReturnValue(createFakeContainer(options).container);
+}
+
+async function callResults(gameDoc: GameDoc): Promise<CapturedResponse> {
+  setupFake({ seed: [toDomain(gameDoc)] });
   return (await getResults(
     {} as Request,
     GAME_PARAMS
@@ -58,11 +67,14 @@ async function callResults(
 function toMongoDoc(
   game: Game,
   options?: { answersAsMap?: boolean }
-): Record<string, unknown> {
+): GameDoc {
   return {
     gameCode: game.id,
+    name: game.name,
     status: "finished",
     createdAt: game.createdAt,
+    creatorId: game.creatorId,
+    currentQuestionIndex: game.currentQuestionIndex,
     players: game.players.map((p) => ({
       id: p.id,
       name: p.name,
@@ -79,17 +91,6 @@ function toMongoDoc(
       options: q.options,
       correctAnswer: q.correctAnswer,
       image: q.image ?? null,
-    })),
-  };
-}
-
-/** Simula el único cambio de presentación de la ruta: Math.round sobre percentage. */
-function toRestResults(results: GameResults): GameResults {
-  return {
-    ...results,
-    leaderboard: results.leaderboard.map((p) => ({
-      ...p,
-      percentage: Math.round(p.percentage),
     })),
   };
 }
@@ -122,9 +123,7 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
     const response = await callResults(toMongoDoc(game));
 
     expect(response.status).toBe(200);
-    expect(connectToDBMock).toHaveBeenCalledTimes(1);
-    expect(findOneMock).toHaveBeenCalledWith({ gameCode: "123456" });
-    expect(toRestResults(calculateResults(game))).toEqual(
+    expect(toResultsDto(calculateResults(game))).toEqual(
       response.body.results
     );
   });
@@ -142,7 +141,7 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
 
     const response = await callResults(toMongoDoc(game));
 
-    expect(response.body.results).toEqual(toRestResults(calculateResults(game)));
+    expect(response.body.results).toEqual(toResultsDto(calculateResults(game)));
   });
 
   it("respuestas parciales: lo no respondido vale answer -1 e isCorrect false", async () => {
@@ -158,7 +157,7 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
 
     const response = await callResults(toMongoDoc(game));
 
-    expect(response.body.results).toEqual(toRestResults(calculateResults(game)));
+    expect(response.body.results).toEqual(toResultsDto(calculateResults(game)));
   });
 
   it("percentage se redondea al entero (33/67) y averageScore NO se redondea (100.5)", async () => {
@@ -179,13 +178,13 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
     const response = await callResults(toMongoDoc(game));
     const raw = calculateResults(game);
 
-    // El dominio entrega el porcentaje crudo; la ruta lo redondea al presentar.
+    // El dominio entrega el porcentaje crudo; el DTO lo redondea al presentar.
     expect(raw.leaderboard[0].percentage).not.toBe(33);
     expect(raw.leaderboard[0].percentage).toBeCloseTo(33.33333333333333);
     expect(response.body.results.leaderboard[0].percentage).toBe(33);
     expect(response.body.results.leaderboard[1].percentage).toBe(67);
     expect(response.body.results.averageScore).toBe(100.5);
-    expect(toRestResults(raw)).toEqual(response.body.results);
+    expect(toResultsDto(raw)).toEqual(response.body.results);
   });
 
   it("sin jugadores: leaderboard [], averageScore 0 por `|| 1` y playerAnswers vacío", async () => {
@@ -199,7 +198,7 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
 
     expect(response.body.results.leaderboard).toEqual([]);
     expect(response.body.results.averageScore).toBe(0);
-    expect(toRestResults(calculateResults(game))).toEqual(
+    expect(toResultsDto(calculateResults(game))).toEqual(
       response.body.results
     );
   });
@@ -219,7 +218,7 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
     expect(response.body.results.totalQuestions).toBe(0);
     expect(response.body.results.questionResults).toEqual([]);
     expect(response.body.results.averageScore).toBe(200);
-    expect(toRestResults(calculateResults(game))).toEqual(
+    expect(toResultsDto(calculateResults(game))).toEqual(
       response.body.results
     );
   });
@@ -244,7 +243,7 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
     const plainResponse = await callResults(toMongoDoc(game));
 
     expect(mapResponse.body).toEqual(plainResponse.body);
-    expect(mapResponse.body.results).toEqual(toRestResults(calculateResults(game)));
+    expect(mapResponse.body.results).toEqual(toResultsDto(calculateResults(game)));
   });
 
   it("avatar: se preserva si existe y la clave queda en undefined (no se omite) si falta", async () => {
@@ -273,7 +272,7 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
     expect(betoRoute.avatar).toBeUndefined();
     expect(Object.keys(betoDomain)).toContain("avatar");
     expect(betoDomain.avatar).toBeUndefined();
-    expect(toRestResults(domainResults)).toEqual(response.body.results);
+    expect(toResultsDto(domainResults)).toEqual(response.body.results);
   });
 
   it("el leaderboard conserva el orden del documento: no ordena por score", async () => {
@@ -293,6 +292,6 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
       "p-zoe",
       "p-ana",
     ]);
-    expect(toRestResults(calculateResults(game))).toEqual(response.body.results);
+    expect(toResultsDto(calculateResults(game))).toEqual(response.body.results);
   });
 });
