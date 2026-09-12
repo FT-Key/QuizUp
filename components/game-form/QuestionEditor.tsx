@@ -5,13 +5,15 @@ import { ImagePicker } from "@/components/ImagePicker";
 import { QUIZ_FILE_LIMITS } from "@/lib/quizFile";
 import type { QuestionImage } from "@/types";
 import type { QuizDraftQuestion } from "@/core/application/builders/quiz-builder";
+import { KAHOOT_COLORS, OPTION_ICONS } from "@/constants/option-colors";
 
-const KAHOOT_COLORS = [
-  { bg: "#E21B3C", name: "Red", icon: "▲" },
-  { bg: "#1368CE", name: "Blue", icon: "◆" },
-  { bg: "#26890C", name: "Green", icon: "●" },
-  { bg: "#FFC900", name: "Yellow", icon: "■" },
-]
+/** Orden del creador: Red, Blue, Green, Yellow (invertido 2↔3 vs. admin). */
+const OPTION_COLORS = [
+  KAHOOT_COLORS.red,
+  KAHOOT_COLORS.blue,
+  KAHOOT_COLORS.green,
+  KAHOOT_COLORS.yellow,
+];
 
 interface QuestionEditorProps {
   index: number;
@@ -42,7 +44,7 @@ export function QuestionEditor({
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-lg"
             style={{
-              background: KAHOOT_COLORS[index % 4].bg
+              background: OPTION_COLORS[index % 4].bg
             }}
           >
             {index + 1}
@@ -85,7 +87,7 @@ export function QuestionEditor({
               key={optionIndex}
               className="relative rounded-2xl overflow-hidden transition-all hover:scale-[1.02]"
               style={{
-                backgroundColor: KAHOOT_COLORS[optionIndex].bg,
+                backgroundColor: OPTION_COLORS[optionIndex].bg,
               }}
             >
 
@@ -103,13 +105,13 @@ export function QuestionEditor({
               </button>
 
               <div className="text-4xl text-white/90 pt-3 pl-3">
-                {KAHOOT_COLORS[optionIndex].icon}
+                {OPTION_ICONS[optionIndex]}
               </div>
 
               <div className="p-3 pt-1">
                 <input
                   type="text"
-                  placeholder={KAHOOT_COLORS[optionIndex].name}
+                  placeholder={OPTION_COLORS[optionIndex].name}
                   value={option}
                   onChange={(e) => onOptionChange(optionIndex, e.target.value)}
                   maxLength={QUIZ_FILE_LIMITS.maxOptionLength}
@@ -125,12 +127,12 @@ export function QuestionEditor({
       <div className="flex items-center gap-2 text-sm text-gray-600">
         <div
           className="w-4 h-4 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: KAHOOT_COLORS[question.correctAnswer].bg }}
+          style={{ backgroundColor: OPTION_COLORS[question.correctAnswer].bg }}
         >
           <Check className="h-3 w-3 text-white" />
         </div>
         <span>
-          Correct answer: <strong>{KAHOOT_COLORS[question.correctAnswer].name}</strong>
+          Correct answer: <strong>{OPTION_COLORS[question.correctAnswer].name}</strong>
           {question.options[question.correctAnswer] && (
             <span className="text-gray-500"> - {question.options[question.correctAnswer]}</span>
           )}
