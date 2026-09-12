@@ -1,9 +1,11 @@
 /**
  * CARACTERIZACIÓN US-13 — `adapters/socket/socket-client.ts` (singleton y opciones de conexión).
  *
- * Migrado 1:1 desde `lib/socket.test.ts` en US-13: el cuerpo de `lib/socket.ts` se
- * movió a `adapters/socket/socket-client.ts` y este archivo solo cambia el import
- * del módulo bajo prueba. Las 6 aserciones se mantienen intactas.
+ * Deriva de `lib/socket.test.ts` (US-13): el cuerpo de `lib/socket.ts` se movió a
+ * `adapters/socket/socket-client.ts` y este archivo solo cambió el import del
+ * módulo bajo prueba. US-15 retiró la API de socket muerta y sus casos; la suite
+ * vigente caracteriza únicamente `initSocket`: singleton, URL por defecto/entorno
+ * y opciones de reconexión.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { asSocket, createFakeSocket, type FakeSocket } from "@/tests/fakes/socket";
