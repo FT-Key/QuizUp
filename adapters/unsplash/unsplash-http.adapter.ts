@@ -12,7 +12,7 @@ import type { Logger } from "@/core/application/ports/logger";
 const PER_PAGE = 24;
 const UPSTREAM_BLOCK_COOLDOWN_MS = 2 * 60 * 1000;
 
-/** Subconjunto de la respuesta upstream que se consume (sin `any`). */
+/** Subconjunto tipado de la respuesta upstream que se consume. */
 interface UnsplashPhoto {
   id: string;
   urls?: { regular?: string; full?: string; small?: string; thumb?: string };

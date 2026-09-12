@@ -60,8 +60,8 @@ export function AnswerChart({ options, counts, correctIndex }: AnswerChartProps)
               tickLine={false}
             />
             <Tooltip
-              formatter={(value: any) => [`${value} respuestas`, "Cantidad"]}
-              labelFormatter={(label: any) => `Opción ${label}`}
+              formatter={(value) => [`${value} respuestas`, "Cantidad"]}
+              labelFormatter={(label) => `Opción ${label}`}
               cursor={{ fill: "rgba(0,0,0,0.04)" }}
             />
             <Bar dataKey="count" radius={[10, 10, 0, 0]}>

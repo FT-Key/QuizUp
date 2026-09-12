@@ -7,7 +7,7 @@ import type { SocketEvents } from "@/types";
 
 /**
  * Unión discriminada evento↔callback del contrato: cada `event` exige el
- * callback de `SocketEvents[event]` (sin `any` y sin perder correlación).
+ * callback de `SocketEvents[event]` (correlación exacta, sin comodines).
  */
 export type SocketEvent = {
   [E in keyof SocketEvents]: { event: E; callback: SocketEvents[E] };
