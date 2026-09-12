@@ -2,12 +2,11 @@ import type { Socket } from "socket.io-client";
 import type { RealtimeClient } from "@/core/application/ports/realtime-client";
 
 // US-13: doble mínimo de `socket.io-client` para caracterizar `useSocket`,
-// `useAdminSocket` y `lib/socket`. No usa estado global: cada llamada a
-// `createFakeSocket()` crea un socket aislado.
+// `useAdminSocket` y `adapters/socket/socket-client`. No usa estado global: cada
+// llamada a `createFakeSocket()` crea un socket aislado.
 //
 // Los tests de hooks deben mockear el PAQUETE `socket.io-client`
-// (`io: () => fake`), no la ruta del adaptador, para que sigan siendo válidos
-// cuando US-13 mueva `lib/socket.ts` a `adapters/socket/socket-client.ts`.
+// (`io: () => fake`), no la ruta del adaptador.
 //
 // Uso con `vi.hoisted` (el factory de `vi.mock` se eleva sobre los imports):
 //
