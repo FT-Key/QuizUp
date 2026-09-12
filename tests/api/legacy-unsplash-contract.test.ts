@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // US-12: caracterización COMPLETA de `app/api/unsplash/search/route.ts`
-// (pre-refactor). Congela status HTTP, bodies, headers, el mapeo exacto de
-// fotos, el orden real de las comprobaciones (query → rate limit por IP → key →
-// caché → cooldown upstream) y los estados a nivel de módulo (cache de 24 h con
-// clave normalizada, rate limit de 30 req/min, cooldown de 2 min tras 403 o
-// `x-ratelimit-remaining: 0`). El refactor de US-12 debe reproducir todo esto
-// byte a byte.
+// (escrita pre-refactor; hoy la ruta es un adaptador fino sobre el container).
+// Congela status HTTP, bodies, headers, el mapeo exacto de fotos, el orden real
+// de las comprobaciones (query → rate limit por IP → key → caché → cooldown
+// upstream) y el estado (cache de 24 h con clave normalizada, rate limit de
+// 30 req/min, cooldown de 2 min tras 403 o `x-ratelimit-remaining: 0`).
+// Ninguna aserción cambió con el refactor.
 //
 // Sin red ni timers reales: se mockea `next/server` (capturando body/status/
 // headers ANTES de que Next los serialice), y se stubbean `fetch`,
-// `UNSPLASH_ACCESS_KEY` y el reloj. La ruta guarda estado en variables de
-// módulo, así que cada test la reimporta tras `vi.resetModules()` para arrancar
-// con caché/rate-limit/cooldown limpios.
+// `UNSPLASH_ACCESS_KEY` y el reloj. El estado vive en la instancia memoizada de
+// `getContainer()`, así que cada test reimporta la ruta tras
+// `vi.resetModules()` para arrancar con caché/rate-limit/cooldown limpios.
 
 const { jsonMock } = vi.hoisted(() => ({
   jsonMock: vi.fn(

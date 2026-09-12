@@ -71,7 +71,7 @@ describe("infra/container", () => {
     expect(typeof first.games.findById).toBe("function");
   });
 
-  it("el grafo expone gameCodes, el repo Mongo y los 7 casos de uso", () => {
+  it("el grafo expone gameCodes, el repo Mongo y los 8 casos de uso", () => {
     const container = createContainer(CONFIG);
 
     expect(typeof container.gameCodes.generate).toBe("function");
@@ -89,11 +89,13 @@ describe("infra/container", () => {
       "getResults",
       "joinGame",
       "listGames",
+      "searchImages",
       "startGame",
     ]);
     for (const useCase of Object.values(container.useCases)) {
       expect(typeof useCase.execute).toBe("function");
     }
+    expect(typeof container.useCases.searchImages.execute).toBe("function");
   });
 
   it("clock respeta el reloj fake e ids genera un UUID v4", () => {
