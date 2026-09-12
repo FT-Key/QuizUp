@@ -169,6 +169,7 @@ export function useGameSessionEvents({
         {
           event: "join-error",
           callback: (payload?: { message?: string }) => {
+            // "" es inválido: fallback intencional
             toast.error(payload?.message || "Failed to join the game");
           },
         },

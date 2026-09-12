@@ -40,7 +40,7 @@ export function useGameSessionActions({
       gameId,
       playerName: trimmed,
       avatar: {
-        seed: avatarSeed || trimmed,
+        seed: avatarSeed || trimmed, // "" es inválido: fallback intencional
         accessories: avatarAccessories.filter((a) => a !== "none"),
       },
     });

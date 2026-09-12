@@ -58,6 +58,7 @@ export function useGameSession(gameId: string): UseGameSessionResult {
     previousLeaderboard: state.previousLeaderboard,
     results: state.results,
     avatar: {
+      // "" es inválido: fallback intencional
       seed: state.playerAvatarSeed || state.player?.name || "",
       accessories: state.playerAccessories,
     },

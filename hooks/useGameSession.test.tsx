@@ -17,7 +17,7 @@ const GAME_ID = "123456";
 
 type SocketEvent = {
   event: string;
-  callback: (...args: any[]) => void;
+  callback: (...args: unknown[]) => void;
 };
 
 const mocks = vi.hoisted(() => ({

@@ -45,7 +45,7 @@ export function useGameSessionBootstrap({
               gameId,
               playerId,
               avatar: {
-                seed: avatarSeed || playerName,
+                seed: avatarSeed || playerName, // "" es inválido: fallback intencional
                 accessories: session
                   .getAccessories()
                   .filter((a) => a !== "none"),
