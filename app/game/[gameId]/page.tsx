@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { Clock, Loader2, Users } from "lucide-react";
+import { withErrorBoundary } from "@/components/withErrorBoundary";
 import { useGameSession } from "@/hooks/useGameSession";
 import { AnswerPanel } from "@/components/game/AnswerPanel";
 import { CancelledPanel } from "@/components/game/CancelledPanel";
@@ -11,7 +12,7 @@ import { ResultPanel } from "@/components/game/ResultPanel";
 import { ScoreboardPanel } from "@/components/game/ScoreboardPanel";
 import { WaitingPanel } from "@/components/game/WaitingPanel";
 
-export default function GamePage() {
+function GamePage() {
   const params = useParams();
   const gameId = params.gameId as string;
   const {
@@ -131,3 +132,5 @@ export default function GamePage() {
     </div>
   );
 }
+
+export default withErrorBoundary(GamePage);

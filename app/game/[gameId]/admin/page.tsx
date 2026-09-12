@@ -8,8 +8,9 @@ import { AdminPresentation } from "@/components/admin/AdminPresentation";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 import { useAdminActions } from "@/hooks/useAdminActions";
+import { withErrorBoundary } from "@/components/withErrorBoundary";
 
-export default function AdminPage() {
+function AdminPage() {
   const { gameId } = useParams();
   const { game, setGame, emit, loading, results } = useAdminSocket(
     gameId as string
@@ -122,3 +123,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+export default withErrorBoundary(AdminPage);
