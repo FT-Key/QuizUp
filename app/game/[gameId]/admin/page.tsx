@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Results } from "@/components/Results";
@@ -8,91 +7,35 @@ import { AdminLobby } from "@/components/admin/AdminLobby";
 import { AdminPresentation } from "@/components/admin/AdminPresentation";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import { useQuestionTimer } from "@/hooks/useQuestionTimer";
+import { useAdminActions } from "@/hooks/useAdminActions";
+import { withErrorBoundary } from "@/components/withErrorBoundary";
+import { GAME_STATUS } from "@/core/domain/game/constants";
+import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
 
-export default function AdminPage() {
+function AdminPage() {
   const { gameId } = useParams();
   const { game, setGame, emit, loading, results } = useAdminSocket(
     gameId as string
   );
 
-  const [isStarting, setIsStarting] = useState(false);
-  const [isFinishing, setIsFinishing] = useState(false);
-
   const { timeLeft, isFinished } = useQuestionTimer(
     game?.currentQuestionStartTime ?? 0,
-    game?.questionTimeLimit ?? 30000
+    game?.questionTimeLimit ?? FALLBACK_QUESTION_TIME_LIMIT_MS
   );
 
-  const questionEnded = game?.status !== "active" || isFinished;
+  const questionEnded = game?.status !== GAME_STATUS.ACTIVE || isFinished;
 
-  
-  const handleStartGame = async () => {
-    setIsStarting(true);
-    try {
-      const res = await fetch(`/api/games/${gameId}/start`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed to start game");
-      const data = await res.json();
-      setGame(data.game);
-      emit("start-game", { gameId });
-    } catch (err) {
-      
-      alert("Failed to start game.");
-    } finally {
-      setIsStarting(false);
-    }
-  };
-
-  const handleFinishGame = async () => {
-    setIsFinishing(true);
-    try {
-      emit("finish-game", { gameId });
-    } catch (err) {
-      
-      alert("Failed to finish game.");
-    } finally {
-      setIsFinishing(false);
-    }
-  };
-
-  const handleNextQuestion = () => {
-    emit("next-question", { gameId });
-    setGame((prev) =>
-      prev
-        ? {
-            ...prev,
-            currentQuestionIndex: prev.currentQuestionIndex + 1,
-            currentQuestionStartTime: Date.now(),
-          }
-        : prev
-    );
-  };
-
-  const handleForceEnd = () => {
-    emit("finish-question", { gameId });
-    setGame((prev) =>
-      prev
-        ? {
-            ...prev,
-            currentQuestionStartTime:
-              Date.now() - (prev.questionTimeLimit || 30000),
-          }
-        : prev
-    );
-  };
-
-  const handleKick = (playerId: string) => {
-    emit("leave-game", { gameId, playerId });
-  };
-
-  const handleToggleLock = () => {
-    if (!game) return;
-    emit("lock-game", { gameId, locked: !game.locked });
-  };
-
-  const handleCloseGame = () => {
-    emit("close-game", { gameId });
-    setGame((prev) => (prev ? { ...prev, status: "cancelled" } : prev));
-  };
+  const {
+    isStarting,
+    isFinishing,
+    startGame,
+    finishGame,
+    nextQuestion,
+    forceEndQuestion,
+    kickPlayer,
+    toggleLock,
+    closeGame,
+  } = useAdminActions({ gameId: gameId as string, game, setGame, emit });
 
   if (loading || !game) {
     return (
@@ -110,8 +53,7 @@ export default function AdminPage() {
     );
   }
 
-  
-  if (game.status === "cancelled") {
+  if (game.status === GAME_STATUS.CANCELLED) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8 text-center space-y-4">
@@ -148,36 +90,33 @@ export default function AdminPage() {
     );
   }
 
-  
-  if (game.status === "waiting") {
+  if (game.status === GAME_STATUS.WAITING) {
     return (
       <AdminLobby
         game={game}
         isStarting={isStarting}
-        onStart={handleStartGame}
-        onKick={handleKick}
-        onToggleLock={handleToggleLock}
-        onClose={handleCloseGame}
+        onStart={startGame}
+        onKick={kickPlayer}
+        onToggleLock={toggleLock}
+        onClose={closeGame}
       />
     );
   }
 
-  
-  if (game.status === "active") {
+  if (game.status === GAME_STATUS.ACTIVE) {
     return (
       <AdminPresentation
         game={game}
         timeLeft={timeLeft}
         questionEnded={questionEnded}
         isFinishing={isFinishing}
-        onForceEnd={handleForceEnd}
-        onNextQuestion={handleNextQuestion}
-        onFinish={handleFinishGame}
+        onForceEnd={forceEndQuestion}
+        onNextQuestion={nextQuestion}
+        onFinish={finishGame}
       />
     );
   }
 
-  
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-4xl mx-auto">
@@ -186,3 +125,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+export default withErrorBoundary(AdminPage);

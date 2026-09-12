@@ -1,24 +1,24 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useSocket } from "./useSocket";
+import { useSocket, type SocketEvent } from "./useSocket";
+import { getGameSessionFacade } from "@/infra/client-container";
 import type { Game, Player, Question, GameResults } from "@/types";
-
-const MAX_RETRIES = 5;
-const RETRY_DELAY_MS = 3000;
+import { GAME_STATUS } from "@/core/domain/game/constants";
+import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
 
 export const useAdminSocket = (gameId: string) => {
   const [game, setGame] = useState<Game | null>(null);
   const [results, setResults] = useState<GameResults | null>(null);
   const [loading, setLoading] = useState(true);
-  const [retryTick, setRetryTick] = useState(0);
 
-  const triedHttpFallback = useRef(false);
+  const fallbackRequested = useRef(false);
+  const gameSession = getGameSessionFacade();
 
-  const { socket, emit, connected } = useSocket({
+  const { emit, connected } = useSocket({
     gameId,
     isAdmin: true,
-    events: useMemo(
+    events: useMemo<SocketEvent[]>(
       () => [
         {
           event: "player-joined",
@@ -76,7 +76,7 @@ export const useAdminSocket = (gameId: string) => {
                 ? {
                     ...prev,
                     currentQuestionStartTime:
-                      Date.now() - (prev.questionTimeLimit || 30000),
+                      Date.now() - (prev.questionTimeLimit || FALLBACK_QUESTION_TIME_LIMIT_MS),
                   }
                 : prev
             );
@@ -84,12 +84,12 @@ export const useAdminSocket = (gameId: string) => {
         },
         {
           event: "game-finished",
-          callback: (data: { game: Game; results: GameResults }) => {
+          callback: (data: { game: Game; results: GameResults | null }) => {
 
             if (data.game) {
               setGame(data.game);
             } else {
-              setGame((prev) => (prev ? { ...prev, status: "finished" } : prev));
+              setGame((prev) => (prev ? { ...prev, status: GAME_STATUS.FINISHED } : prev));
             }
             if (data.results) {
               setResults(data.results);
@@ -105,7 +105,7 @@ export const useAdminSocket = (gameId: string) => {
               setGame(data.game);
             } else {
               setGame((prev) =>
-                prev ? { ...prev, status: "cancelled" } : prev
+                prev ? { ...prev, status: GAME_STATUS.CANCELLED } : prev
               );
             }
             setLoading(false);
@@ -125,7 +125,7 @@ export const useAdminSocket = (gameId: string) => {
               ...incomingGame,
               currentQuestionIndex,
               currentQuestionStartTime:
-                Date.now() - ((incomingGame.questionTimeLimit || 30000) - timeLeft),
+                Date.now() - ((incomingGame.questionTimeLimit || FALLBACK_QUESTION_TIME_LIMIT_MS) - timeLeft),
             });
             setLoading(false);
           },
@@ -135,60 +135,30 @@ export const useAdminSocket = (gameId: string) => {
     ),
   });
 
-  const fetchGameViaHttp = async () => {
-    try {
-
-      const res = await fetch(`/api/games/${gameId}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.game) {
-          setGame(data.game);
-          setLoading(false);
-        }
-      }
-    } catch (err) {
-
-    }
-  };
-
+  // Primer request al conectar (y en cada reconexión).
   useEffect(() => {
-    if (!socket || !gameId || !connected) return;
+    if (!connected) return;
 
-    socket.emit("request-game-state", { gameId });
-  }, [socket, gameId, connected]);
+    gameSession.requestGameState(gameId);
+  }, [gameSession, connected, gameId]);
 
+  // Retry + fallback: el bucle vive en la facade; el hook lo cancela cuando llega estado.
   useEffect(() => {
     if (!loading) return;
 
-    if (retryTick >= MAX_RETRIES) {
-      if (!triedHttpFallback.current) {
-        triedHttpFallback.current = true;
-        fetchGameViaHttp();
-      }
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setRetryTick((t) => t + 1);
-    }, RETRY_DELAY_MS);
-
-    return () => clearTimeout(timer);
-  }, [loading, retryTick]);
-
-  useEffect(() => {
-    if (retryTick === 0 || !loading) return;
-    if (retryTick <= MAX_RETRIES && socket && connected) {
-
-      socket.emit("request-game-state", { gameId });
-    }
-  }, [retryTick, socket, connected, gameId, loading]);
-
-  useEffect(() => {
-    if (!connected) return;
-    if (loading && socket) {
-      socket.emit("request-game-state", { gameId });
-    }
-  }, [connected]);
+    return gameSession.scheduleGameStateRetry(gameId, {
+      onExhausted: () => {
+        if (fallbackRequested.current) return; // EXACTAMENTE UNA VEZ (caracterizado)
+        fallbackRequested.current = true;
+        void gameSession.fetchGameState(gameId).then((httpGame) => {
+          if (httpGame) {
+            setGame(httpGame);
+            setLoading(false);
+          }
+        });
+      },
+    });
+  }, [gameSession, gameId, loading]);
 
   return { game, setGame, emit, loading, results };
 };

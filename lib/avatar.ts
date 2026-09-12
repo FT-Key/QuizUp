@@ -1,4 +1,4 @@
-import { Avatar, Style } from '@dicebear/core';
+import { Avatar, Style, type StyleOptions } from '@dicebear/core';
 import avataaarsDefinition from '@dicebear/styles/avataaars.json';
 
 export type AvatarExpression = 'happy' | 'sad' | 'neutral';
@@ -43,21 +43,16 @@ export function generateAvatarSvg(config: AvatarConfig): string {
 
   const style = new Style(avataaarsDefinition);
   const expressionOptions = EXPRESSION_MAP[expression] || EXPRESSION_MAP.neutral;
+  const validAccessories = (accessories ?? []).filter((a) => a !== 'none');
 
-  const avatarOptions: Record<string, any> = {
+  const avatarOptions: StyleOptions = {
     seed,
     size,
     ...expressionOptions,
+    ...(validAccessories.length > 0
+      ? { accessoriesVariant: validAccessories[0], accessoriesProbability: 100 }
+      : {}),
   };
-
-  if (accessories && accessories.length > 0) {
-    const validAccessories = accessories.filter(a => a !== 'none');
-    if (validAccessories.length > 0) {
-      avatarOptions.accessoriesVariant = validAccessories[0];
-
-      avatarOptions.accessoriesProbability = 100;
-    }
-  }
 
   const avatar = new Avatar(style, avatarOptions);
 

@@ -49,7 +49,7 @@ export function AudioPlayer() {
 
     const tryPlay = () => {
       if (audio.paused) {
-        audio.play().catch(() => {});
+        audio.play().catch(() => undefined); // best-effort: el navegador puede bloquear el autoplay
       }
     };
 
@@ -149,8 +149,7 @@ export function AudioPlayer() {
           style={{
             writingMode: "vertical-lr",
             direction: "rtl",
-            WebkitAppearance: "slider-vertical",
-            appearance: "slider-vertical",
+            WebkitAppearance: "slider-vertical"
           }}
         />
       </div>

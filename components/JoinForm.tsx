@@ -5,14 +5,18 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, Gamepad2, User, ArrowRight } from "lucide-react"
 import { AvatarSelector } from "./AvatarSelector"
+import { usePlayerSession } from "@/hooks/usePlayerSession"
 import type { JoinGameData } from "@/types"
 
 export function JoinForm() {
   const router = useRouter()
+  const session = usePlayerSession()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [step, setStep] = useState<'name' | 'avatar'>('name')
-  const [formData, setFormData] = useState<JoinGameData>({
+  // El estado local siempre inicializa `playerName`: la opcionalidad del evento
+  // no aplica al formulario (invariante local declarada, sin cambio de runtime).
+  const [formData, setFormData] = useState<JoinGameData & { playerName: string }>({
     gameId: "",
     playerName: "",
   })
@@ -50,13 +54,13 @@ export function JoinForm() {
         throw new Error(data.error || "Failed to join game")
       }
 
-      localStorage.setItem("playerId", data.player.id)
-      localStorage.setItem("playerName", data.player.name)
+      session.set("playerId", data.player.id)
+      session.set("playerName", data.player.name)
       if (avatarSeed) {
-        localStorage.setItem("playerAvatarSeed", avatarSeed)
+        session.set("playerAvatarSeed", avatarSeed)
       }
       if (avatarAccessories.length > 0) {
-        localStorage.setItem("playerAvatarAccessories", JSON.stringify(avatarAccessories))
+        session.setAccessories(avatarAccessories)
       }
 
       router.push(`/game/${formData.gameId}`)

@@ -111,6 +111,7 @@ export function ImagePicker({ image, onChange }: ImagePickerProps) {
       const res = await fetch(
         `/api/unsplash/search?query=${encodeURIComponent(q)}&page=${next}`
       );
+      // best-effort: sin body si la respuesta no es JSON (se evalúa res.ok después)
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         if (data && typeof data.message === "string") setError(data.message);
