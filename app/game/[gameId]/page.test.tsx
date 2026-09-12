@@ -41,6 +41,10 @@ const mocks = vi.hoisted(() => ({
   results: null as null | { gameId: string; results?: GameResults | null },
 }));
 
+const sonnerMock = vi.hoisted(() => ({ error: vi.fn() }));
+
+vi.mock("sonner", () => ({ toast: { error: sonnerMock.error } }));
+
 vi.mock("next/navigation", () => ({
   useParams: () => ({ gameId: "123456" }),
 }));
@@ -95,7 +99,6 @@ vi.mock("@/components/AvatarSelector", () => ({
 type FetchFunction = (input: string, init?: RequestInit) => Promise<Response>;
 
 let fetchMock: ReturnType<typeof vi.fn<FetchFunction>>;
-let alertSpy: ReturnType<typeof vi.spyOn>;
 
 const jsonResponse = (body: unknown, ok = true): Response =>
   ({ ok, json: async () => body }) as unknown as Response;
@@ -164,7 +167,7 @@ beforeEach(() => {
   mocks.results = null;
   fetchMock = vi.fn<FetchFunction>();
   vi.stubGlobal("fetch", fetchMock);
-  alertSpy = vi.spyOn(window, "alert").mockImplementation(() => undefined);
+  sonnerMock.error.mockClear();
 });
 
 afterEach(() => {
@@ -567,9 +570,9 @@ describe("GamePage (caracterización US-14)", () => {
     await screen.findByText("Trivia de prueba");
 
     await trigger("join-error", { message: "Sala llena" });
-    expect(alertSpy).toHaveBeenCalledWith("Sala llena");
+    expect(sonnerMock.error).toHaveBeenCalledWith("Sala llena");
 
     await trigger("join-error", {});
-    expect(alertSpy).toHaveBeenCalledWith("Failed to join the game");
+    expect(sonnerMock.error).toHaveBeenCalledWith("Failed to join the game");
   });
 });
