@@ -35,6 +35,9 @@ export default defineConfig({
             "hooks/**/*.test.tsx",
             "components/**/*.test.ts",
             "components/**/*.test.tsx",
+            // US-14: tests de caracterización de páginas del App Router
+            // (game/admin) que renderizan componentes cliente en jsdom.
+            "app/**/*.test.tsx",
           ],
         },
       },
