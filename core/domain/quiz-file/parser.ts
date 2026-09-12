@@ -1,36 +1,7 @@
-import type { QuestionImage } from "@/types";
-
-export const QUIZ_FILE_LIMITS = {
-  maxFileBytes: 2 * 1024 * 1024, // 2 MB
-  maxQuestions: 100,
-  maxNameLength: 80,
-  maxQuestionTextLength: 300,
-  maxOptionLength: 120,
-  maxAltLength: 200,
-  maxAuthorLength: 80,
-  maxUrlLength: 2048,
-  allowedTimeLimits: [20000, 30000, 40000] as const,
-};
-
-export interface SanitizedQuestion {
-  text: string;
-  options: [string, string, string, string];
-  correctAnswer: number;
-  image: QuestionImage | null;
-}
-
-export interface SanitizedQuiz {
-  name?: string;
-  questionTimeLimit?: number;
-  questions: SanitizedQuestion[];
-}
-
-export class QuizFileError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "QuizFileError";
-  }
-}
+import type { QuestionImage } from "../question";
+import { QUIZ_FILE_LIMITS } from "./constants";
+import { QuizFileError } from "./errors";
+import type { SanitizedQuestion, SanitizedQuiz } from "./types";
 
 const UNSAFE_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { QuestionImage } from "@/types";
-import type { SanitizedQuiz } from "@/lib/quizFile";
+import type { SanitizedQuiz } from "@/core/domain/quiz-file";
 import {
   createEmptyQuestion,
   createEmptyQuizDraft,

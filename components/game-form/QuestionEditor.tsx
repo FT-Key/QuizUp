@@ -2,7 +2,7 @@
 
 import { Check, Trash2 } from "lucide-react";
 import { ImagePicker } from "@/components/ImagePicker";
-import { QUIZ_FILE_LIMITS } from "@/lib/quizFile";
+import { QUIZ_FILE_LIMITS } from "@/core/domain/quiz-file";
 import type { QuestionImage } from "@/types";
 import type { QuizDraftQuestion } from "@/core/application/builders/quiz-builder";
 import { KAHOOT_COLORS, OPTION_ICONS } from "@/constants/option-colors";

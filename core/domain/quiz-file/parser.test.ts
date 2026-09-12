@@ -4,7 +4,7 @@ import {
   QUIZ_FILE_LIMITS,
   QuizFileError,
   sanitizeQuizData,
-} from "./quizFile";
+} from "@/core/domain/quiz-file";
 
 type RawRecord = Record<string, unknown>;
 
