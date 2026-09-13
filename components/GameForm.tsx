@@ -96,7 +96,7 @@ export function GameForm() {
           </h2>
           <div className="flex items-center gap-2">
 
-            <QuizFileActions draft={draft} onImport={importQuiz} />
+            <QuizFileActions draft={draft} onImport={importQuiz} canExport={isValid} />
 
             <button
               type="button"

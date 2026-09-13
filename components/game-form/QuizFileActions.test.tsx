@@ -1,10 +1,9 @@
 /**
  * CARACTERIZACIÓN US-21 (H4) — `components/game-form/QuizFileActions.tsx`.
  *
- * Congela el ESTADO PREVIO a H4: el ítem "Exportar (.quizup)" está SIEMPRE
- * habilitado y exporta incluso con el draft vacío (payload real de
- * `buildQuizExportPayload`). US-21 lo deshabilitará cuando el draft no cumpla
- * los mínimos (`!isValidDraft`).
+ * H4: el ítem "Exportar (.quizup)" queda deshabilitado cuando `canExport=false`
+ * (draft sin los mínimos, `!isValidDraft`), sin descargar ni avisar. Con
+ * `canExport=true` exporta el payload real de `buildQuizExportPayload`.
  *
  * Mockea `sonner` y `URL.createObjectURL`/`revokeObjectURL`; usa el parser real
  * de `core/domain/quiz-file`. Sin red.
@@ -70,26 +69,34 @@ const menuItemFor = (label: string): Element => {
 const fileInput = (container: HTMLElement) =>
   container.querySelector('input[type="file"]') as HTMLInputElement;
 
-const renderActions = (draft: QuizDraft = createEmptyQuizDraft()) => {
+const renderActions = (
+  draft: QuizDraft = createEmptyQuizDraft(),
+  canExport = true
+) => {
   const onImport = vi.fn();
-  const utils = render(<QuizFileActions draft={draft} onImport={onImport} />);
+  const utils = render(
+    <QuizFileActions draft={draft} onImport={onImport} canExport={canExport} />
+  );
   return { ...utils, onImport };
 };
 
 describe("QuizFileActions (caracterización US-21 H4)", () => {
-  it("con draft vacío el ítem 'Exportar (.quizup)' existe y NO está deshabilitado (previo a H4)", async () => {
-    renderActions();
+  it("con canExport=false el ítem 'Exportar (.quizup)' está deshabilitado y no descarga (H4)", async () => {
+    renderActions(createEmptyQuizDraft(), false);
     await openFileMenu();
 
     const exportItem = menuItemFor("Exportar (.quizup)");
-    // US-21 (H4): pasará a `data-disabled="true"` cuando !isValidDraft.
-    expect(exportItem.getAttribute("data-disabled")).toBeNull();
-    expect(exportItem.getAttribute("aria-disabled")).toBeNull();
+    expect(exportItem.hasAttribute("data-disabled")).toBe(true);
+    expect(exportItem.getAttribute("aria-disabled")).toBe("true");
+
+    fireEvent.click(screen.getByText("Exportar (.quizup)"));
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(clickedAnchor).toBeNull();
 
     expect(screen.getByText("Importar (.quizup)")).toBeTruthy();
   });
 
-  it("exporta el draft vacío: descarga .quizup con 'Quiz sin nombre'", async () => {
+  it("con canExport=true exporta el draft vacío: descarga .quizup con 'Quiz sin nombre'", async () => {
     renderActions();
     await openFileMenu();
     fireEvent.click(screen.getByText("Exportar (.quizup)"));

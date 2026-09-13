@@ -307,15 +307,19 @@ describe("GameForm (caracterización US-14)", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock");
   });
 
-  it("Exportar sin nombre usa 'Quiz sin nombre' y quiz.quizup", async () => {
+  it("Exportar está deshabilitado si el draft no tiene nombre (H4)", async () => {
     render(<GameForm />);
     fillValidQuestion();
+    await openFileMenu();
 
-    const payload = await exportPayload();
+    const exportItem = screen
+      .getByText("Exportar (.quizup)")
+      .closest('[role="menuitem"]');
+    expect(exportItem?.hasAttribute("data-disabled")).toBe(true);
 
-    expect(payload.name).toBe("Quiz sin nombre");
-    expect(payload.questions).toHaveLength(1);
-    expect(clickedAnchor?.download).toBe("quiz.quizup");
+    fireEvent.click(screen.getByText("Exportar (.quizup)"));
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(clickedAnchor).toBeNull();
   });
 
   it("Exportar incluye image solo cuando la pregunta tiene un url (import de Unsplash)", async () => {
@@ -325,6 +329,7 @@ describe("GameForm (caracterización US-14)", () => {
         JSON.stringify({
           format: "quizup",
           version: 1,
+          name: "Quiz con imagen",
           questions: [
             {
               text: "Con imagen",
