@@ -33,9 +33,11 @@ const setup = (
     index?: number;
     question?: QuizDraftQuestion;
     canRemove?: boolean;
+    isOpen?: boolean;
   } = {}
 ) => {
   const onRemove = vi.fn();
+  const onToggle = vi.fn();
   const onTextChange = vi.fn();
   const onOptionChange = vi.fn();
   const onCorrectAnswerChange = vi.fn();
@@ -46,6 +48,8 @@ const setup = (
       index={props.index ?? 0}
       question={props.question ?? makeQuestion()}
       canRemove={props.canRemove ?? false}
+      isOpen={props.isOpen ?? true}
+      onToggle={onToggle}
       onRemove={onRemove}
       onTextChange={onTextChange}
       onOptionChange={onOptionChange}
@@ -57,6 +61,7 @@ const setup = (
   return {
     ...utils,
     onRemove,
+    onToggle,
     onTextChange,
     onOptionChange,
     onCorrectAnswerChange,
@@ -129,14 +134,35 @@ describe("QuestionEditor (caracterización US-21 H5)", () => {
     expect(withRemove.onRemove).toHaveBeenCalledTimes(1);
   });
 
-  it("HOY cualquier pregunta se renderiza expandida (cambiará en H5)", () => {
-    setup({ index: 4, question: makeQuestion({ text: "P5" }) });
+  it("isOpen=true renderiza el contenido del panel y aria-expanded=true (H5)", () => {
+    setup({ index: 4, question: makeQuestion({ text: "P5" }), isOpen: true });
 
-    // US-21 (H5): habrá acordeón y, por defecto, solo la primera abierta.
     expect(screen.getByText("Question 5")).toBeTruthy();
     expect(screen.getByDisplayValue("P5")).toBeTruthy();
     expect(
       screen.getByPlaceholderText("Type your question here...")
     ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Question 5/ }).getAttribute("aria-expanded")
+    ).toBe("true");
+  });
+
+  it("isOpen=false oculta el contenido, marca aria-expanded=false y el header llama onToggle (H5)", () => {
+    const { onToggle } = setup({
+      index: 1,
+      question: makeQuestion({ text: "P2" }),
+      isOpen: false,
+    });
+
+    expect(screen.getByText("Question 2")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Type your question here...")).toBeNull();
+    expect(screen.queryByPlaceholderText("Red")).toBeNull();
+    expect(screen.queryByText("Answer Options")).toBeNull();
+
+    const header = screen.getByRole("button", { name: /Question 2/ });
+    expect(header.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(header);
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 });

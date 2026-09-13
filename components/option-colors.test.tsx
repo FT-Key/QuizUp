@@ -121,6 +121,8 @@ describe("BL-11: QuestionEditor (creador) — mismo orden que QuestionCard", () 
         index={0}
         question={question}
         canRemove={false}
+        isOpen
+        onToggle={vi.fn()}
         onRemove={vi.fn()}
         onTextChange={vi.fn()}
         onOptionChange={vi.fn()}
