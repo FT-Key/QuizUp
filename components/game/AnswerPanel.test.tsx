@@ -50,7 +50,7 @@ afterEach(() => {
 });
 
 describe("AnswerPanel (caracterización US-21 H2)", () => {
-  it("con hasSubmitted muestra la confirmación actual con check (cambiará en H2)", () => {
+  it("con hasSubmitted y pregunta sin terminar muestra la espera directa sin check (H2)", () => {
     render(
       <AnswerPanel
         question={QUESTION}
@@ -60,13 +60,26 @@ describe("AnswerPanel (caracterización US-21 H2)", () => {
       />
     );
 
-    // US-21 (H2): este bloque se reemplaza por el mensaje de espera directo.
-    // El assert del ✅ y de "¡Respuesta enviada!" cambiará intencionalmente.
-    expect(screen.getByText("✅")).toBeTruthy();
-    expect(screen.getByText("¡Respuesta enviada!")).toBeTruthy();
-    expect(screen.getByText("Esperando a los demás jugadores...")).toBeTruthy();
+    expect(
+      screen.getByText("Esperando respuestas de los demás jugadores…")
+    ).toBeTruthy();
+    expect(screen.queryByText("¡Respuesta enviada!")).toBeNull();
+    expect(screen.queryByText("✅")).toBeNull();
     expect(screen.queryByText(/stub-question-card/)).toBeNull();
     expect(mocks.submit).not.toHaveBeenCalled();
+  });
+
+  it("con hasSubmitted y pregunta terminada devuelve null (la página muestra ResultPanel)", () => {
+    const { container } = render(
+      <AnswerPanel
+        question={QUESTION}
+        hasSubmitted
+        isQuestionFinished
+        onAnswerSubmit={mocks.submit}
+      />
+    );
+
+    expect(container.firstChild).toBeNull();
   });
 
   it("con isQuestionFinished y sin result devuelve null", () => {

@@ -11,7 +11,7 @@
  *
  * NOTA DE ENTORNO: ver `JoinForm.test.tsx` (`oxc.jsx` en `vitest.config.ts`).
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QuestionCard } from "@/components/QuestionCard";
 import type { Question } from "@/types";
@@ -26,7 +26,8 @@ const question: Question = {
   image: null,
 };
 
-const optionButtons = () => screen.getAllByRole("button");
+const optionButtons = () =>
+  screen.getAllByRole("button") as HTMLButtonElement[];
 
 afterEach(() => {
   cleanup();
@@ -43,16 +44,16 @@ describe("QuestionCard (caracterización US-21 H2/H3)", () => {
     expect(optionButtons()).toHaveLength(4);
   });
 
-  it("HOY la grilla es 1 columna en mobile (cambiará en H3)", () => {
+  it("la grilla es 2×2 también en mobile (H3)", () => {
     const { container } = render(
       <QuestionCard question={question} onAnswerSubmit={vi.fn()} />
     );
 
     const grid = container.querySelector("div.grid");
     expect(grid).toBeTruthy();
-    expect(grid?.className).toContain("grid-cols-1");
-    expect(grid?.className).toContain("sm:grid-cols-2");
-    // US-21 (H3): pasará a `grid-cols-2` también en mobile (2×2).
+    expect(grid?.className).toContain("grid-cols-2");
+    // Ya no hay 1 columna en mobile.
+    expect(grid?.className).not.toContain("grid-cols-1");
   });
 
   it("un click llama onAnswerSubmit(index) una sola vez; el segundo click no reenvía", () => {
@@ -67,26 +68,14 @@ describe("QuestionCard (caracterización US-21 H2/H3)", () => {
 
     fireEvent.click(buttons[3]);
     expect(onAnswerSubmit).toHaveBeenCalledTimes(1);
+    // Tras el click las 4 opciones quedan deshabilitadas (anti reenvío).
+    expect(buttons.every((button) => button.disabled)).toBe(true);
   });
 
-  it("muestra 'Sending your answer...' mientras el submit está pendiente (cambiará en H2)", async () => {
-    let resolveSubmit: () => void = () => {};
-    const onAnswerSubmit = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveSubmit = resolve;
-        })
-    );
-
-    render(<QuestionCard question={question} onAnswerSubmit={onAnswerSubmit} />);
+  it("no muestra overlay de check ni 'Sending your answer...' (H2)", () => {
+    render(<QuestionCard question={question} onAnswerSubmit={vi.fn()} />);
     fireEvent.click(optionButtons()[0]);
 
-    // US-21 (H2): este texto se elimina junto con el overlay de check.
-    expect(screen.getByText("Sending your answer...")).toBeTruthy();
-
-    resolveSubmit();
-    await waitFor(() =>
-      expect(screen.queryByText("Sending your answer...")).toBeNull()
-    );
+    expect(screen.queryByText("Sending your answer...")).toBeNull();
   });
 });
