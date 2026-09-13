@@ -8,7 +8,7 @@
  * timers falsos (`tests/fakes/timers.ts`). Proyecto `unit` (entorno node).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MUSIC_DEFAULT_VOLUME, MUSIC_FADE_MS } from "@/constants/music";
+import { MUSIC_DEFAULT_VOLUME, MUSIC_FADE_MS, MUSIC_FADE_STEP_MS } from "@/constants/music";
 import { FakeAudioElement } from "@/tests/fakes/audio";
 import { FakeAudioMixer } from "@/tests/fakes/audio-mixer";
 import { fakeTimers } from "@/tests/fakes/timers";
@@ -196,6 +196,72 @@ describe("createMusicPlayer — avance de playlist", () => {
     element.emitEnded();
     await timers.advanceAsync(FADE);
     expect(element.src).toContain("/music/a.mp3");
+  });
+});
+
+describe("createMusicPlayer — duración de rampa (US-23 AC3)", () => {
+  it("el fade-out de contexto baja a 0 a los ~1500 ms, con valores intermedios", async () => {
+    const timers = fakeTimers();
+    const { element, mixer, player } = setup();
+    await startWithGesture(player, element);
+
+    player.setContext("game");
+    await timers.advanceAsync(MUSIC_FADE_MS / 2);
+    const mid = mixer.lastTrackGain;
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(MUSIC_DEFAULT_VOLUME);
+    // A mitad de rampa la pista vieja sigue sonando: aún no hubo swap.
+    expect(element.src).toContain("/music/QueueUp.mp3");
+
+    // Un tick antes del final aún no llegó a 0 ni cambió de pista.
+    await timers.advanceAsync(MUSIC_FADE_MS / 2 - MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBeGreaterThan(0);
+    expect(element.src).toContain("/music/QueueUp.mp3");
+
+    // Recién a los 1500 ms la saliente llega a 0 y se cambia de pista.
+    await timers.advanceAsync(MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBe(0);
+    expect(element.src).toContain("/music/QuizUp.mp3");
+  });
+
+  it("el fade-in tras el cambio de contexto sube al target a los ~1500 ms", async () => {
+    const timers = fakeTimers();
+    const { element, mixer, player } = setup();
+    await startWithGesture(player, element);
+
+    player.setContext("game");
+    await timers.advanceAsync(MUSIC_FADE_MS); // completa el fade-out
+    expect(mixer.lastTrackGain).toBe(0);
+
+    await timers.advanceAsync(MUSIC_FADE_MS - MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBeGreaterThan(0);
+    expect(mixer.lastTrackGain).toBeLessThan(MUSIC_DEFAULT_VOLUME);
+
+    await timers.advanceAsync(MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBeCloseTo(MUSIC_DEFAULT_VOLUME, 5);
+  });
+
+  it("el avance por ended hace el fade-in de la siguiente pista también en ~1500 ms", async () => {
+    const timers = fakeTimers();
+    const { element, mixer, player } = setup();
+    await startWithGesture(player, element);
+    const playsBefore = element.playCallCount;
+
+    element.emitEnded();
+    // El swap de `src` es inmediato; la rampa de subida es la que dura 1500 ms.
+    expect(element.src).toContain("/music/QueueUp2.mp3");
+    expect(element.playCallCount).toBe(playsBefore + 1);
+
+    await timers.advanceAsync(MUSIC_FADE_MS / 2);
+    const mid = mixer.lastTrackGain;
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(MUSIC_DEFAULT_VOLUME);
+
+    await timers.advanceAsync(MUSIC_FADE_MS / 2 - MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBeLessThan(MUSIC_DEFAULT_VOLUME);
+
+    await timers.advanceAsync(MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBeCloseTo(MUSIC_DEFAULT_VOLUME, 5);
   });
 });
 
