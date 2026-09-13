@@ -19,26 +19,19 @@ interface QuestionCardProps {
 
 export function QuestionCard({ question, onAnswerSubmit }: QuestionCardProps) {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSelect = useCallback(async (index: number) => {
-    if (selectedAnswer !== null || isSubmitting) return
+  const handleSelect = useCallback((index: number) => {
+    if (selectedAnswer !== null) return
 
     setSelectedAnswer(index)
-    setIsSubmitting(true)
-
-    try {
-      await onAnswerSubmit(index)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [selectedAnswer, isSubmitting, onAnswerSubmit])
+    onAnswerSubmit(index)
+  }, [selectedAnswer, onAnswerSubmit])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-6">
 
       <div
-        className="bg-white rounded-3xl shadow-xl p-4 sm:p-8 text-center"
+        className="bg-white rounded-3xl shadow-xl p-3 sm:p-8 text-center"
         style={{ animation: "bounce-in 0.5s ease-out" }}
       >
         {question.image?.url && (
@@ -46,22 +39,22 @@ export function QuestionCard({ question, onAnswerSubmit }: QuestionCardProps) {
           <img
             src={question.image.url}
             alt={question.image.alt || "Imagen de la pregunta"}
-            className="w-full max-h-52 sm:max-h-64 object-contain rounded-2xl mb-4 mx-auto"
+            className="w-full max-h-28 sm:max-h-64 object-contain rounded-2xl mb-2 sm:mb-4 mx-auto"
           />
         )}
-        <p className="text-2xl md:text-3xl font-black text-gray-800 leading-tight">
+        <p className="text-lg sm:text-2xl md:text-3xl font-black text-gray-800 leading-tight">
           {question.text}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4">
         {question.options.map((option, index) => (
           <button
             key={index}
             onClick={() => handleSelect(index)}
             disabled={selectedAnswer !== null}
             className={`
-              relative rounded-3xl p-5 sm:p-6 min-h-[120px] sm:min-h-[140px] flex flex-col items-center justify-center text-center
+              relative rounded-2xl sm:rounded-3xl p-3 sm:p-6 min-h-[84px] sm:min-h-[140px] flex flex-col items-center justify-center text-center
               transition-all duration-200
               ${selectedAnswer === index
                 ? "scale-95 ring-4 ring-white shadow-2xl"
@@ -69,7 +62,6 @@ export function QuestionCard({ question, onAnswerSubmit }: QuestionCardProps) {
                   ? "opacity-50 scale-95"
                   : "hover:scale-[1.03] hover:shadow-xl active:scale-95"
               }
-              ${isSubmitting && selectedAnswer === index ? "animate-pulse" : ""}
             `}
             style={{
               backgroundColor: OPTION_COLORS[index].bg,
@@ -77,32 +69,16 @@ export function QuestionCard({ question, onAnswerSubmit }: QuestionCardProps) {
             }}
           >
 
-            <span className="text-5xl md:text-6xl text-white/90 mb-2">
+            <span className="text-3xl sm:text-5xl md:text-6xl text-white/90 mb-1 sm:mb-2">
               {OPTION_ICONS[index]}
             </span>
 
-            <span className="text-lg md:text-xl font-bold text-white leading-tight">
+            <span className="text-sm sm:text-lg md:text-xl font-bold text-white leading-tight line-clamp-2 break-words">
               {option}
             </span>
-
-            {selectedAnswer === index && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-3xl">
-                <div className="bg-white rounded-full p-4">
-                  <svg className="h-10 w-10 text-[#26890C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </div>
-            )}
           </button>
         ))}
       </div>
-
-      {isSubmitting && (
-        <div className="text-center text-white font-bold text-lg">
-          Sending your answer...
-        </div>
-      )}
     </div>
   )
 }
