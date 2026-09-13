@@ -8,7 +8,7 @@ export default function CreatePage() {
     <div className="min-h-dvh flex flex-col items-center justify-center p-4 py-8">
       <div className="w-full max-w-3xl space-y-6" style={{ animation: "slide-up 0.6s ease-out" }}>
 
-        <div className="text-center space-y-3">
+        <div className="text-center space-y-3 bg-white/15 backdrop-blur-sm rounded-3xl px-4 py-4 sm:px-6 sm:py-5">
           <div style={{ animation: "bounce-in 0.6s ease-out" }}>
             <img
               src="/logo-quizup.png"

@@ -31,7 +31,7 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${GeistMono.variable} notranslate`}
       style={{ fontFamily: GeistSans.style.fontFamily }}
     >
-      <body className="min-h-screen overflow-x-hidden">
+      <body className="min-h-dvh overflow-x-hidden">
         <div
           className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
           style={{
@@ -39,7 +39,7 @@ export default function RootLayout({
             filter: "blur(2px)"
           }}
         />
-        <div className="relative min-h-screen">{children}</div>
+        <div className="relative min-h-dvh">{children}</div>
         <AudioPlayer />
         <Toaster />
       </body>
