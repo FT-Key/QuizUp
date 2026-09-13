@@ -5,10 +5,10 @@ import Link from "next/link"
 
 export default function HomePage() {
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center p-4 py-6 sm:py-8">
-      <div className="w-full max-w-md space-y-6 sm:space-y-8" style={{ animation: "slide-up 0.6s ease-out" }}>
+    <div className="h-dvh flex flex-col items-center justify-center p-3 py-4 sm:p-4 sm:py-8">
+      <div className="w-full max-w-md space-y-4 sm:space-y-8" style={{ animation: "slide-up 0.6s ease-out" }}>
 
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-2 sm:space-y-4">
           <div
             className="inline-block"
             style={{ animation: "bounce-in 0.8s ease-out" }}
@@ -16,16 +16,16 @@ export default function HomePage() {
             <img
               src="/logo-quizup.png"
               alt="QuizUp!"
-              className="h-32 md:h-40 mx-auto drop-shadow-2xl"
+              className="h-20 sm:h-32 md:h-40 mx-auto drop-shadow-2xl"
             />
           </div>
-          <p className="text-xl text-white/90 font-medium">
+          <p className="text-base sm:text-xl text-white/90 font-medium">
             Enter a game code and play with friends!
           </p>
         </div>
 
         <div
-          className="bg-white rounded-3xl shadow-2xl p-8"
+          className="bg-white rounded-3xl shadow-2xl p-5 sm:p-8"
           style={{ animation: "bounce-in 0.9s ease-out" }}
         >
           <JoinForm />

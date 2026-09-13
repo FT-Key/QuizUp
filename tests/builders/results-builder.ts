@@ -17,6 +17,9 @@ export interface ResultsPlayerFixture {
   name: string;
   score?: number; // default 0 (score persistido)
   answers?: Record<string, number>; // default {}
+  /** US-20: sin campo ⇒ clave ausente (legacy); `{}` ⇒ partida nueva sin tiempos. */
+  answerTimesMs?: Record<string, number>;
+  joinedAt?: Date; // default new Date(0)
   avatar?: PlayerAvatar;
 }
 
@@ -80,15 +83,20 @@ export class ResultsBuilder {
   }
 
   withPlayer(fixture: ResultsPlayerFixture): this {
-    this.game.players.push({
+    const player: Player = {
       id: fixture.id,
       name: fixture.name,
       gameId: this.game.id,
       answers: { ...(fixture.answers ?? {}) },
       score: fixture.score ?? 0,
-      joinedAt: new Date(0),
+      joinedAt: new Date((fixture.joinedAt ?? new Date(0)).getTime()),
       avatar: fixture.avatar,
-    });
+    };
+    // La ausencia de `answerTimesMs` (legacy) se preserva: la clave no se crea.
+    if (fixture.answerTimesMs !== undefined) {
+      player.answerTimesMs = { ...fixture.answerTimesMs };
+    }
+    this.game.players.push(player);
     return this;
   }
 
@@ -112,7 +120,12 @@ export class ResultsBuilder {
     return this;
   }
 
-  /** Copia defensiva: clona createdAt, questions (+options/image) y players (+answers/joinedAt/avatar). */
+  withJoinedAt(playerId: string, joinedAt: Date): this {
+    this.findPlayer(playerId).joinedAt = new Date(joinedAt.getTime());
+    return this;
+  }
+
+  /** Copia defensiva: clona createdAt, questions (+options/image) y players (+answers/answerTimesMs/joinedAt/avatar). */
   build(): Game {
     return {
       ...this.game,
@@ -126,6 +139,9 @@ export class ResultsBuilder {
         ...p,
         gameId: this.game.id,
         answers: { ...p.answers },
+        ...(p.answerTimesMs !== undefined
+          ? { answerTimesMs: { ...p.answerTimesMs } }
+          : {}),
         joinedAt: new Date(p.joinedAt.getTime()),
         avatar: p.avatar ? { ...p.avatar } : p.avatar,
       })),

@@ -69,6 +69,9 @@ export function createJoinGameUseCase(deps: JoinGameDeps): JoinGameUseCase {
         name: input.playerName,
         gameId: game.id,
         answers: {},
+        // US-20: alta nueva siempre con la clave presente (posible `{}` = sin
+        // tiempos aún); distingue "nueva sin datos" de "legacy" (clave ausente).
+        answerTimesMs: {},
         score: 0,
         joinedAt: new Date(deps.clock.now()),
         avatar: input.avatar ?? { seed: input.playerName },

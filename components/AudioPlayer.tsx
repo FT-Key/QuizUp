@@ -145,7 +145,7 @@ export function AudioPlayer() {
           max={100}
           value={volume}
           onChange={handleVolumeChange}
-          className="w-24 h-24 cursor-pointer"
+          className="w-10 h-24 cursor-pointer"
           style={{
             writingMode: "vertical-lr",
             direction: "rtl",

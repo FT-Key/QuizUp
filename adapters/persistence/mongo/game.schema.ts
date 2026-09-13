@@ -34,6 +34,9 @@ const playerSchema = new Schema({
   name: { type: String, required: true },
   gameId: { type: String, required: true },
   answers: { type: Map, of: Number, default: {} },
+  // US-20: sin `default` a propósito; la ausencia en partidas legacy debe
+  // sobrevivir al `create` crudo (el mapper materializa `{}` en altas nuevas).
+  answerTimesMs: { type: Map, of: Number },
   score: { type: Number, default: 0 },
   joinedAt: { type: Date, default: Date.now },
   avatar: { type: playerAvatarSchema, default: null },
