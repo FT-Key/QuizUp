@@ -49,32 +49,38 @@ describe("AvatarSelector (caracterización US-21 H1)", () => {
     expect(onSelect).toHaveBeenCalledWith("Felix", ["none"]);
   });
 
-  it("el botón togglea el panel de accesorios hoy en flujo (cambiará en H1)", () => {
-    render(<AvatarSelector playerName="Ana" onSelect={vi.fn()} />);
+  it("el trigger de accesorios es un dropdown portaled con aria-expanded (H1)", async () => {
+    const { container } = render(
+      <AvatarSelector playerName="Ana" onSelect={vi.fn()} />
+    );
+    const root = container.firstChild as HTMLElement;
+    const childCountBefore = root.childElementCount;
 
+    const trigger = screen.getByRole("button", {
+      name: /Personalizar accesorios/,
+    });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("Accesorios faciales")).toBeNull();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Personalizar accesorios/ })
-    );
-    // US-21 (H1): hoy el panel es un <div> insertado en el flujo (empuja el
-    // resto); pasará a dropdown/popover que no desplaza el componente.
-    expect(screen.getByText("Accesorios faciales")).toBeTruthy();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Ocultar accesorios/ })
-    );
-    expect(screen.queryByText("Accesorios faciales")).toBeNull();
+    expect(await screen.findByText("Accesorios faciales")).toBeTruthy();
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    // El dropdown vive en un Portal (fuera del componente): el selector no gana
+    // hijos al abrirse (proxy de "no desplaza el resto").
+    expect(container.textContent).not.toContain("Accesorios faciales");
+    expect(root.childElementCount).toBe(childCountBefore);
   });
 
-  it("seleccionar 'Gafas de sol' llama onSelect(seed, ['sunglasses'])", () => {
+  it("seleccionar 'Gafas de sol' llama onSelect(seed, ['sunglasses'])", async () => {
     const onSelect = vi.fn();
     render(<AvatarSelector playerName="Ana" onSelect={onSelect} />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /Personalizar accesorios/ })
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: /Personalizar accesorios/ }),
+      { key: "ArrowDown" }
     );
-    fireEvent.click(screen.getByRole("button", { name: "Gafas de sol" }));
+    fireEvent.click(await screen.findByText("Gafas de sol"));
 
     expect(onSelect).toHaveBeenLastCalledWith("Ana", ["sunglasses"]);
   });

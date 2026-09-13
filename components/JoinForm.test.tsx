@@ -76,8 +76,11 @@ describe("JoinForm (caracterización US-13)", () => {
     goToAvatarStep(container);
 
     selectFirstAvatarSeed(container);
-    fireEvent.click(screen.getByRole("button", { name: /Personalizar accesorios/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Gafas de sol" }));
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: /Personalizar accesorios/i }),
+      { key: "ArrowDown" }
+    );
+    fireEvent.click(await screen.findByText("Gafas de sol"));
 
     fireEvent.click(screen.getByRole("button", { name: /UNIRSE/ }));
 
