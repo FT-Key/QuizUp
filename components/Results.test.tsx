@@ -216,4 +216,88 @@ describe("Results (caracterización US-14)", () => {
     expect(screen.getByText("350")).toBeTruthy();
     expect(screen.getByText("pts")).toBeTruthy();
   });
+
+  it("US-20: con empate en score muestra 'Faster answers · 45.2s' solo en la primera fila", async () => {
+    await renderAndRevealStats(
+      makeResults({
+        totalPlayers: 4,
+        totalQuestions: 3,
+        leaderboard: [
+          makeLeaderboardEntry({
+            playerId: "p1",
+            name: "Ana",
+            score: 350,
+            correctAnswers: 3,
+            totalTimeMs: 45200,
+          }),
+          makeLeaderboardEntry({
+            playerId: "p2",
+            name: "Beto",
+            score: 350,
+            correctAnswers: 3,
+            totalTimeMs: 60000,
+          }),
+        ],
+      })
+    );
+
+    expect(screen.getByText("Faster answers · 45.2s")).toBeTruthy();
+    // El badge va únicamente en quien ganó el desempate (una sola vez).
+    expect(screen.getAllByText(/Faster answers/)).toHaveLength(1);
+    // El orden y los puntajes del leaderboard se siguen mostrando.
+    expect(screen.getByText("Ana")).toBeTruthy();
+    expect(screen.getByText("Beto")).toBeTruthy();
+  });
+
+  it("US-20: sin empate en score no muestra el badge aunque haya totalTimeMs", async () => {
+    await renderAndRevealStats(
+      makeResults({
+        totalPlayers: 2,
+        totalQuestions: 3,
+        leaderboard: [
+          makeLeaderboardEntry({
+            playerId: "p1",
+            name: "Ana",
+            score: 350,
+            correctAnswers: 3,
+            totalTimeMs: 45200,
+          }),
+          makeLeaderboardEntry({
+            playerId: "p2",
+            name: "Beto",
+            score: 100,
+            correctAnswers: 1,
+            totalTimeMs: 60000,
+          }),
+        ],
+      })
+    );
+
+    expect(screen.queryByText(/Faster answers/)).toBeNull();
+  });
+
+  it("US-20: empate legacy sin totalTimeMs no muestra el badge (no se inventan tiempos)", async () => {
+    await renderAndRevealStats(
+      makeResults({
+        totalPlayers: 4,
+        totalQuestions: 3,
+        leaderboard: [
+          makeLeaderboardEntry({
+            playerId: "p1",
+            name: "Ana",
+            score: 350,
+            correctAnswers: 3,
+          }),
+          makeLeaderboardEntry({
+            playerId: "p2",
+            name: "Beto",
+            score: 350,
+            correctAnswers: 3,
+          }),
+        ],
+      })
+    );
+
+    expect(screen.queryByText(/Faster answers/)).toBeNull();
+  });
 });
