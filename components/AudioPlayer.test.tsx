@@ -85,6 +85,18 @@ function clearGlobalAudioContext(): void {
   delete (window as unknown as AudioContextWindow).AudioContext;
 }
 
+/**
+ * US-23 — contenedor completo del control (`[data-volume-control]`: botón +
+ * panel), sobre el que recaen `onMouseEnter`/`onMouseLeave`.
+ */
+function getVolumeControl(): HTMLElement {
+  const control = document.querySelector("[data-volume-control]");
+  if (!(control instanceof HTMLElement)) {
+    throw new Error("No se encontró el control de volumen");
+  }
+  return control;
+}
+
 beforeEach(async () => {
   localStorage.clear();
   stub = createAudioStub();
@@ -343,6 +355,94 @@ describe("AudioPlayer — volumen y mute (US-20/AC6)", () => {
     expect(player.isMuted()).toBe(true);
     expect(button.getAttribute("aria-label")).toBe("Unmute");
     expect(localStorage.getItem("quizup-muted")).toBe("true");
+  });
+});
+
+describe("AudioPlayer — panel de volumen (US-23 H1)", () => {
+  it("mouseenter sobre el control abre el panel y mouseleave lo cierra (AC1)", () => {
+    render(<loaded.AudioPlayer />);
+    const button = screen.getByRole("button");
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.mouseEnter(getVolumeControl());
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.mouseLeave(getVolumeControl());
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("el click del botón alterna mute sin que el mouse altere el panel (AC1)", () => {
+    render(<loaded.AudioPlayer />);
+    const button = screen.getByRole("button");
+    const player = loaded.getMusicPlayer();
+    fireEvent.mouseEnter(getVolumeControl());
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(player.isMuted()).toBe(true);
+
+    fireEvent.pointerDown(button, { pointerType: "mouse" });
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(button);
+    expect(player.isMuted()).toBe(false);
+    expect(localStorage.getItem("quizup-muted")).toBe("false");
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("pointerdown táctil abre y vuelve a cerrar el panel (AC2)", () => {
+    render(<loaded.AudioPlayer />);
+    const button = screen.getByRole("button");
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.pointerDown(button, { pointerType: "touch" });
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.pointerDown(button, { pointerType: "touch" });
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("un tap real (pointerdown touch + click) abre el panel y, además, alterna el mute (comportamiento actual)", () => {
+    render(<loaded.AudioPlayer />);
+    const button = screen.getByRole("button");
+    const player = loaded.getMusicPlayer();
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(player.isMuted()).toBe(true);
+
+    // Un tap táctil real despacha primero `pointerdown` y luego `click`.
+    // Comportamiento actual y aceptado por el review de US-23: el `pointerdown`
+    // alterna el panel (false -> true) y el `click` posterior alterna el mute
+    // (true -> false), de modo que un solo tap hace ambas cosas. No se desacopla
+    // el mute del tap para no cambiar la interacción existente; si se decidiera
+    // que un tap solo abre/cierra el panel, habría que frenar el click táctil y
+    // este test pasaría a esperar aria-expanded=true y muted sin cambios.
+    fireEvent.pointerDown(button, { pointerType: "touch" });
+    fireEvent.click(button);
+
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(player.isMuted()).toBe(false);
+    expect(localStorage.getItem("quizup-muted")).toBe("false");
+  });
+
+  it("el slider sigue usable con el panel abierto por hover (AC1)", () => {
+    render(<loaded.AudioPlayer />);
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+
+    fireEvent.mouseEnter(getVolumeControl());
+    fireEvent.change(slider, { target: { value: "70" } });
+
+    expect(slider.value).toBe("70");
+    expect(localStorage.getItem("quizup-volume")).toBe("70");
+    expect(loaded.getMusicPlayer().getTargetVolume()).toBeCloseTo(0.7, 5);
+  });
+
+  it("el click-outside sigue cerrando el panel abierto por hover", () => {
+    render(<loaded.AudioPlayer />);
+    const button = screen.getByRole("button");
+
+    fireEvent.mouseEnter(getVolumeControl());
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(document.body);
+    expect(button.getAttribute("aria-expanded")).toBe("false");
   });
 });
 
