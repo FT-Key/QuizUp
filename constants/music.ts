@@ -18,6 +18,10 @@ export const MUSIC_FADE_STEP_MS = 50;
 /** Volumen objetivo por defecto (0..1) = 40 %. */
 export const MUSIC_DEFAULT_VOLUME = 0.4;
 
+/** Rango del slider de volumen en porcentaje (0..100); el player usa fracción 0..1. */
+export const MUSIC_VOLUME_MIN_PERCENT = 0;
+export const MUSIC_VOLUME_MAX_PERCENT = 100;
+
 /** Clave de localStorage del slider (0..100). */
 export const MUSIC_VOLUME_STORAGE_KEY = "quizup-volume";
 
