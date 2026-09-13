@@ -4,7 +4,7 @@ import type { Game } from "@/core/domain/game";
 import type { GameResults } from "@/core/domain/results/results-calculator";
 import type { NewGame } from "@/core/application/ports/game-repository";
 import {
-  answersToRecord,
+  numberMapToRecord,
   toDomain,
   toGameDto,
   toGameSummaryDto,
@@ -81,9 +81,9 @@ function gameFixture(overrides: Partial<Game> = {}): Game {
   };
 }
 
-describe("answersToRecord", () => {
+describe("numberMapToRecord", () => {
   it("convierte un Map nativo a Record", () => {
-    const record = answersToRecord(new Map<string, number>([["q1", 2], ["q2", 1]]));
+    const record = numberMapToRecord(new Map<string, number>([["q1", 2], ["q2", 1]]));
 
     expect(record).toEqual({ q1: 2, q2: 1 });
   });
@@ -91,24 +91,24 @@ describe("answersToRecord", () => {
   it("convierte una subclase estilo MongooseMap (instanceof Map) sin perder respuestas", () => {
     const mongooseLike = new FakeMongooseMap([["q1", 2], ["q2", 1]]);
 
-    expect(answersToRecord(mongooseLike)).toEqual({ q1: 2, q2: 1 });
+    expect(numberMapToRecord(mongooseLike)).toEqual({ q1: 2, q2: 1 });
     // Regresión que motiva el orden de las ramas: el spread directo de un Map da {}.
     expect({ ...mongooseLike }).toEqual({});
   });
 
   it("copia un objeto plano sin aliasing", () => {
     const source = { q1: 2, q2: 1 };
-    const record = answersToRecord(source);
+    const record = numberMapToRecord(source);
 
     expect(record).toEqual({ q1: 2, q2: 1 });
     expect(record).not.toBe(source);
   });
 
   it("devuelve {} para null, undefined, string y number", () => {
-    expect(answersToRecord(null)).toEqual({});
-    expect(answersToRecord(undefined)).toEqual({});
-    expect(answersToRecord("q1")).toEqual({});
-    expect(answersToRecord(42)).toEqual({});
+    expect(numberMapToRecord(null)).toEqual({});
+    expect(numberMapToRecord(undefined)).toEqual({});
+    expect(numberMapToRecord("q1")).toEqual({});
+    expect(numberMapToRecord(42)).toEqual({});
   });
 });
 
@@ -371,6 +371,49 @@ describe("toDomain", () => {
     expect(fromLean.answers).toEqual({ q1: 2 });
     expect(fromLean.answers).not.toBe(plainAnswers);
   });
+
+  it("normaliza answerTimesMs de Map/lean a Record y preserva la ausencia legacy", () => {
+    const base: GameDoc = {
+      gameCode: "123456",
+      name: "Tiempos",
+      createdAt: CREATED_AT,
+      creatorId: "creator-1",
+      status: "waiting",
+      currentQuestionIndex: 0,
+    };
+    const withMap: GameDoc = {
+      ...base,
+      players: [
+        {
+          id: "p1",
+          name: "Ana",
+          joinedAt: JOINED_AT,
+          answerTimesMs: new FakeMongooseMap([["q1", 504]]),
+        },
+      ],
+    };
+    const timesPlain = { q1: 504 };
+    const withLean: GameDoc = {
+      ...base,
+      players: [
+        { id: "p1", name: "Ana", joinedAt: JOINED_AT, answerTimesMs: timesPlain },
+      ],
+    };
+    const legacy: GameDoc = {
+      ...base,
+      players: [{ id: "p1", name: "Ana", joinedAt: JOINED_AT }],
+    };
+
+    const fromMap = toDomain(withMap).players[0];
+    const fromLean = toDomain(withLean).players[0];
+    const fromLegacy = toDomain(legacy).players[0];
+
+    expect(fromMap.answerTimesMs).toEqual({ q1: 504 });
+    expect(fromLean).toEqual(fromMap);
+    expect(fromLean.answerTimesMs).not.toBe(timesPlain);
+    // Legacy: la clave queda AUSENTE (no `{}`); `totalTimeMsOf` devolverá undefined.
+    expect("answerTimesMs" in fromLegacy).toBe(false);
+  });
 });
 
 describe("toPersistence", () => {
@@ -451,6 +494,7 @@ describe("toPersistence", () => {
           name: "Ana",
           gameId: "123456",
           answers: { q1: 2 },
+          answerTimesMs: {},
           score: 1500,
           joinedAt: JOINED_AT,
           avatar: { seed: "ana" },
@@ -460,6 +504,7 @@ describe("toPersistence", () => {
           name: "Beto",
           gameId: "123456",
           answers: {},
+          answerTimesMs: {},
           score: 0,
           joinedAt: JOINED_AT,
           avatar: null,
@@ -475,7 +520,7 @@ describe("toPersistence", () => {
     expect(persisted.questions[0]).not.toHaveProperty("_id");
   });
 
-  it("toPersistencePlayer emite avatar null si falta y clona answers", () => {
+  it("toPersistencePlayer emite avatar null, materializa answerTimesMs {} y clona answers", () => {
     const player = gameFixture().players[1];
     const persisted = toPersistencePlayer(player);
 
@@ -484,11 +529,22 @@ describe("toPersistence", () => {
       name: "Beto",
       gameId: "123456",
       answers: {},
+      // US-20: alta sin tiempos ⇒ `{}` (la ausencia legacy no llega acá).
+      answerTimesMs: {},
       score: 0,
       joinedAt: JOINED_AT,
       avatar: null,
     });
     expect(persisted.answers).not.toBe(player.answers);
+  });
+
+  it("toPersistencePlayer clona answerTimesMs sin aliasing cuando existe", () => {
+    const player = gameFixture().players[0];
+    const times = { q1: 504 };
+    const persisted = toPersistencePlayer({ ...player, answerTimesMs: times });
+
+    expect(persisted.answerTimesMs).toEqual({ q1: 504 });
+    expect(persisted.answerTimesMs).not.toBe(times);
   });
 });
 

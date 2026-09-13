@@ -81,17 +81,18 @@ describe("core/application/use-cases/get-results", () => {
     expect(results.gameId).toBe("123456");
     expect(results.totalPlayers).toBe(2);
     expect(results.totalQuestions).toBe(3);
+    // US-20: leaderboard ordenado por score desc ⇒ Beto (101) primero.
     expect(results.leaderboard[0]).toMatchObject({
-      playerId: "p1",
-      name: "Ana",
-      score: 100,
-      correctAnswers: 1,
+      playerId: "p2",
+      name: "Beto",
+      score: 101,
+      correctAnswers: 2,
       totalQuestions: 3,
     });
-    expect(results.leaderboard[0].percentage).toBeCloseTo(33.33333333333333);
-    expect(results.leaderboard[0].percentage).not.toBe(33);
-    expect(results.leaderboard[1].percentage).toBeCloseTo(66.66666666666666);
-    expect(results.leaderboard[1].percentage).not.toBe(67);
+    expect(results.leaderboard[0].percentage).toBeCloseTo(66.66666666666666);
+    expect(results.leaderboard[0].percentage).not.toBe(67);
+    expect(results.leaderboard[1].percentage).toBeCloseTo(33.33333333333333);
+    expect(results.leaderboard[1].percentage).not.toBe(33);
     // `averageScore` tampoco se redondea (100 + 101) / 2.
     expect(results.averageScore).toBe(100.5);
     expect(results.questionResults).toHaveLength(3);

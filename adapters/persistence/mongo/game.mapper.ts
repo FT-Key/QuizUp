@@ -27,6 +27,8 @@ export interface GameDocPlayer {
   name: string;
   gameId?: string;
   answers?: unknown;
+  /** US-20: mapa numérico (`Map` o lean); ausente en partidas legacy. */
+  answerTimesMs?: unknown;
   score?: number;
   joinedAt: Date;
   avatar?: PlayerAvatar | null;
@@ -55,6 +57,8 @@ export interface PersistedPlayer {
   name: string;
   gameId: string;
   answers: Record<string, number>;
+  /** US-20: el alta materializa `{}` cuando falta (legacy no se fabrica al releer). */
+  answerTimesMs: Record<string, number>;
   score: number;
   joinedAt: Date;
   avatar: PlayerAvatar | null;
@@ -128,14 +132,14 @@ export type StartGameDto = Omit<GameDto, "locked">;
 // ---------------------------------------------------------------------------
 
 /**
- * Única conversión `answers` Mongo → `Record`.
+ * Única conversión de mapa numérico Mongo → `Record` (`answers`, `answerTimesMs`).
  * Un `Map` (nativo o `MongooseMap`, que extiende `Map` en Mongoose 8) JAMÁS
  * puede pasarse por spread: daría `{}`; por eso se evalúa `instanceof Map`
  * antes del camino de objeto plano.
  */
-export function answersToRecord(answers: unknown): Record<string, number> {
-  if (answers instanceof Map) return Object.fromEntries(answers as Map<string, number>);
-  if (answers && typeof answers === "object") return { ...(answers as Record<string, number>) };
+export function numberMapToRecord(numbers: unknown): Record<string, number> {
+  if (numbers instanceof Map) return Object.fromEntries(numbers as Map<string, number>);
+  if (numbers && typeof numbers === "object") return { ...(numbers as Record<string, number>) };
   return {};
 }
 
@@ -158,7 +162,11 @@ export function toDomain(doc: GameDoc): Game {
       id: p.id,
       name: p.name,
       gameId: doc.gameCode,
-      answers: answersToRecord(p.answers),
+      answers: numberMapToRecord(p.answers),
+      // US-20: legacy sin el campo ⇒ la clave NO se inventa (la UI no muestra badge).
+      ...(p.answerTimesMs !== undefined && p.answerTimesMs !== null
+        ? { answerTimesMs: numberMapToRecord(p.answerTimesMs) }
+        : {}),
       score: p.score ?? 0,
       joinedAt: p.joinedAt,
       avatar: p.avatar ?? undefined,
@@ -176,6 +184,8 @@ export function toPersistencePlayer(player: Player): PersistedPlayer {
     name: player.name,
     gameId: player.gameId,
     answers: { ...player.answers },
+    // US-20: materializa `{}` para altas nuevas; no muta ni aliasa el origen.
+    answerTimesMs: { ...(player.answerTimesMs ?? {}) },
     score: player.score,
     joinedAt: player.joinedAt,
     avatar: player.avatar ?? null,

@@ -86,6 +86,8 @@ describe("core/application/use-cases/join-game", () => {
       name: "Alice",
       gameId: "123456",
       answers: {},
+      // US-20: el alta nueva nace con la clave presente y vacía.
+      answerTimesMs: {},
       score: 0,
       joinedAt: new Date(NOW),
       avatar: { seed: "Alice" },
