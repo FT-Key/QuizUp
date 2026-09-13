@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { Clock, Loader2, Users } from "lucide-react";
 import { withErrorBoundary } from "@/components/withErrorBoundary";
 import { useGameSession } from "@/hooks/useGameSession";
+import { useMusicContextPublisher } from "@/hooks/useMusicContext";
 import { GAME_PHASE } from "@/hooks/game-session/constants";
 import { GAME_STATUS } from "@/core/domain/game/constants";
 import { AnswerPanel } from "@/components/game/AnswerPanel";
@@ -31,6 +32,8 @@ function GamePage() {
     avatar,
     actions,
   } = useGameSession(gameId);
+
+  useMusicContextPublisher(game?.status, Boolean(player));
 
   if (loading)
     return (
