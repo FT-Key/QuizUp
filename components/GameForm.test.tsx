@@ -165,18 +165,43 @@ describe("GameForm (caracterización US-14)", () => {
     expect(trashButtons(container)).toHaveLength(0);
   });
 
-  it("eliminar la primera de dos preguntas conserva el contenido de la segunda", () => {
+  it("acordeón: la primera está abierta por defecto y Add Question abre la nueva y pliega la anterior (H5)", () => {
+    render(<GameForm />);
+
+    expect(screen.getAllByPlaceholderText("Type your question here...")).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: /Question 1/ }).getAttribute("aria-expanded")
+    ).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: /Add Question/ }));
+
+    // Q2 abierta, Q1 plegada: un solo textarea en el DOM.
+    expect(screen.getAllByPlaceholderText("Type your question here...")).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: /Question 2/ }).getAttribute("aria-expanded")
+    ).toBe("true");
+    expect(
+      screen.getByRole("button", { name: /Question 1/ }).getAttribute("aria-expanded")
+    ).toBe("false");
+  });
+
+  it("eliminar la primera de dos preguntas conserva el contenido de la segunda y la deja abierta", () => {
     const { container } = render(<GameForm />);
 
     changeInput(screen.getByPlaceholderText("Type your question here..."), "A");
     fireEvent.click(screen.getByRole("button", { name: /Add Question/ }));
-    changeInput(screen.getAllByPlaceholderText("Type your question here...")[1], "B");
+    // Tras Add Question, Q2 es la única abierta.
+    changeInput(screen.getAllByPlaceholderText("Type your question here...")[0], "B");
 
     fireEvent.click(trashButtons(container)[0]);
 
     expect(screen.getByText("Questions (1)")).toBeTruthy();
     expect(screen.getByDisplayValue("B")).toBeTruthy();
     expect(screen.queryByDisplayValue("A")).toBeNull();
+    // openIndex 1→0: la sobreviviente queda abierta.
+    expect(
+      screen.getByRole("button", { name: /Question 1/ }).getAttribute("aria-expanded")
+    ).toBe("true");
   });
 
   it("submit deshabilitado hasta nombre + texto + 4 opciones no vacías", () => {
@@ -307,15 +332,19 @@ describe("GameForm (caracterización US-14)", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock");
   });
 
-  it("Exportar sin nombre usa 'Quiz sin nombre' y quiz.quizup", async () => {
+  it("Exportar está deshabilitado si el draft no tiene nombre (H4)", async () => {
     render(<GameForm />);
     fillValidQuestion();
+    await openFileMenu();
 
-    const payload = await exportPayload();
+    const exportItem = screen
+      .getByText("Exportar (.quizup)")
+      .closest('[role="menuitem"]');
+    expect(exportItem?.hasAttribute("data-disabled")).toBe(true);
 
-    expect(payload.name).toBe("Quiz sin nombre");
-    expect(payload.questions).toHaveLength(1);
-    expect(clickedAnchor?.download).toBe("quiz.quizup");
+    fireEvent.click(screen.getByText("Exportar (.quizup)"));
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(clickedAnchor).toBeNull();
   });
 
   it("Exportar incluye image solo cuando la pregunta tiene un url (import de Unsplash)", async () => {
@@ -325,6 +354,7 @@ describe("GameForm (caracterización US-14)", () => {
         JSON.stringify({
           format: "quizup",
           version: 1,
+          name: "Quiz con imagen",
           questions: [
             {
               text: "Con imagen",
@@ -381,6 +411,11 @@ describe("GameForm (caracterización US-14)", () => {
     ).toBe("Importado");
     expect(screen.getByDisplayValue("P1")).toBeTruthy();
     expect(screen.getByDisplayValue("a")).toBeTruthy();
+    // Importar abre la primera pregunta y pliega la segunda (H5).
+    expect(
+      screen.getByRole("button", { name: /Question 1/ }).getAttribute("aria-expanded")
+    ).toBe("true");
+    expect(screen.queryByDisplayValue("P2")).toBeNull();
     expect(screen.getByRole("button", { name: "30s" }).className).toContain(
       "bg-white"
     );

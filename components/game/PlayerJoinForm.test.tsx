@@ -55,7 +55,7 @@ describe("PlayerJoinForm (caracterización US-17 BL-06)", () => {
     });
   });
 
-  it("con accesorios elegidos, onJoin lleva seed y accesorios (sin 'none')", () => {
+  it("con accesorios elegidos, onJoin lleva seed y accesorios (sin 'none')", async () => {
     const onJoin = vi.fn();
     const { container } = render(<PlayerJoinForm onJoin={onJoin} />);
 
@@ -65,10 +65,11 @@ describe("PlayerJoinForm (caracterización US-17 BL-06)", () => {
     fireEvent.click(screen.getByRole("button", { name: "SIGUIENTE" }));
 
     selectFirstAvatarSeed(container);
-    fireEvent.click(
-      screen.getByRole("button", { name: /Personalizar accesorios/i })
+    fireEvent.keyDown(
+      screen.getByRole("button", { name: /Personalizar accesorios/i }),
+      { key: "ArrowDown" }
     );
-    fireEvent.click(screen.getByRole("button", { name: "Gafas de sol" }));
+    fireEvent.click(await screen.findByText("Gafas de sol"));
     fireEvent.click(screen.getByRole("button", { name: "JOIN GAME" }));
 
     expect(onJoin).toHaveBeenCalledWith({

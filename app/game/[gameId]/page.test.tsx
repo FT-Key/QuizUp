@@ -282,10 +282,10 @@ describe("GamePage (caracterización US-14)", () => {
       questionId: "q7",
       answer: 2,
     });
-    expect(await screen.findByText("¡Respuesta enviada!")).toBeTruthy();
+    expect(await screen.findByText("Esperando respuestas de los demás jugadores…")).toBeTruthy();
   });
 
-  it("en fase question con respuesta propia muestra '¡Respuesta enviada!' y oculta QuestionCard", async () => {
+  it("en fase question con respuesta propia muestra la espera y oculta QuestionCard", async () => {
     setSession("p1", "Ana");
     fetchMock.mockResolvedValue(
       jsonResponse({
@@ -302,8 +302,8 @@ describe("GamePage (caracterización US-14)", () => {
 
     render(<GamePage />);
 
-    await screen.findByText("¡Respuesta enviada!");
-    expect(screen.getByText("Esperando a los demás jugadores...")).toBeTruthy();
+    await screen.findByText("Esperando respuestas de los demás jugadores…");
+    expect(screen.queryByText("¡Respuesta enviada!")).toBeNull();
     expect(screen.queryByRole("button", { name: "responder-2" })).toBeNull();
   });
 
@@ -323,7 +323,7 @@ describe("GamePage (caracterización US-14)", () => {
     );
 
     render(<GamePage />);
-    await screen.findByText("¡Respuesta enviada!");
+    await screen.findByText("Esperando respuestas de los demás jugadores…");
 
     await trigger("question-finished", { currentQuestionIndex: 0 });
 
@@ -368,7 +368,7 @@ describe("GamePage (caracterización US-14)", () => {
     );
 
     render(<GamePage />);
-    await screen.findByText("¡Respuesta enviada!");
+    await screen.findByText("Esperando respuestas de los demás jugadores…");
 
     await trigger("question-finished", { currentQuestionIndex: 0 });
 
@@ -482,7 +482,7 @@ describe("GamePage (caracterización US-14)", () => {
     );
 
     render(<GamePage />);
-    await screen.findByText("¡Respuesta enviada!");
+    await screen.findByText("Esperando respuestas de los demás jugadores…");
 
     vi.useFakeTimers();
     await trigger("question-finished", { currentQuestionIndex: 0 });
@@ -526,7 +526,7 @@ describe("GamePage (caracterización US-14)", () => {
     );
 
     render(<GamePage />);
-    await screen.findByText("¡Respuesta enviada!");
+    await screen.findByText("Esperando respuestas de los demás jugadores…");
 
     const finishedGame = makeGame({
       status: "finished",

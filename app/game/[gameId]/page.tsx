@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { Clock, Loader2, Users } from "lucide-react";
 import { withErrorBoundary } from "@/components/withErrorBoundary";
 import { useGameSession } from "@/hooks/useGameSession";
+import { useMusicContextPublisher } from "@/hooks/useMusicContext";
 import { GAME_PHASE } from "@/hooks/game-session/constants";
 import { GAME_STATUS } from "@/core/domain/game/constants";
 import { AnswerPanel } from "@/components/game/AnswerPanel";
@@ -32,6 +33,8 @@ function GamePage() {
     actions,
   } = useGameSession(gameId);
 
+  useMusicContextPublisher(game?.status, Boolean(player));
+
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -54,9 +57,9 @@ function GamePage() {
 
   if (!player) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-dvh flex p-4">
         <div
-          className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8"
+          className="w-full max-w-md m-auto bg-white rounded-3xl shadow-2xl p-8"
           style={{ animation: "bounce-in 0.6s ease-out" }}
         >
           <h2 className="text-2xl font-black text-center text-gray-800 mb-6">
@@ -69,20 +72,20 @@ function GamePage() {
   }
 
   return (
-    <div className="min-h-screen p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-dvh p-3 sm:p-4">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
 
         <div
-          className="text-center space-y-3 py-4 sm:py-6 px-4 sm:px-8 bg-white/15 backdrop-blur-sm rounded-3xl"
+          className="text-center space-y-2 py-2 sm:py-6 px-3 sm:px-8 bg-white/15 backdrop-blur-sm rounded-3xl"
           style={{ animation: "slide-up 0.5s ease-out" }}
         >
           <h1
-            className="text-2xl sm:text-3xl md:text-4xl font-black text-white"
+            className="text-xl sm:text-3xl md:text-4xl font-black text-white"
             style={{ textShadow: "0 2px 10px rgba(0,0,0,0.2)" }}
           >
             {game.name}
           </h1>
-          <div className="flex items-center justify-center flex-wrap gap-3 sm:gap-6 text-sm sm:text-base font-bold">
+          <div className="flex items-center justify-center flex-wrap gap-2 sm:gap-6 text-xs sm:text-base font-bold">
             <div className="flex items-center space-x-2 text-white/90">
               <Users className="h-4 w-4 sm:h-5 sm:w-5" />
               <span>{game.players.length} players</span>

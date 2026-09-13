@@ -24,12 +24,15 @@ import {
 interface QuizFileActionsProps {
   draft: QuizDraft;
   onImport: (quiz: SanitizedQuiz) => void;
+  canExport: boolean;
 }
 
-export function QuizFileActions({ draft, onImport }: QuizFileActionsProps) {
+export function QuizFileActions({ draft, onImport, canExport }: QuizFileActionsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
+    if (!canExport) return;
+
     const payload = buildQuizExportPayload(draft, new Date().toISOString());
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -93,6 +96,7 @@ export function QuizFileActions({ draft, onImport }: QuizFileActionsProps) {
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={handleExport}
+            disabled={!canExport}
             className="cursor-pointer font-medium"
           >
             <Download className="h-4 w-4 mr-2" />

@@ -3,6 +3,14 @@
 import { useState } from 'react';
 import { Avatar } from './Avatar';
 import { ACCESSORY_OPTIONS } from '@/lib/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from '@/components/ui/dropdown-menu';
 
 interface AvatarSelectorProps {
   playerName: string;
@@ -25,7 +33,6 @@ const AVATARS_PER_PAGE = 16;
 export function AvatarSelector({ playerName, onSelect, initialSeed }: AvatarSelectorProps) {
   const [selectedSeed, setSelectedSeed] = useState<string>(initialSeed || playerName);
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>(['none']);
-  const [showAccessories, setShowAccessories] = useState(false);
   const [page, setPage] = useState(0);
 
   const totalPages = Math.ceil(ALL_AVATAR_SEEDS.length / AVATARS_PER_PAGE);
@@ -68,39 +75,38 @@ export function AvatarSelector({ playerName, onSelect, initialSeed }: AvatarSele
       </div>
 
       <div className="flex justify-center">
-        <button
-          onClick={() => setShowAccessories(!showAccessories)}
-          className="px-4 py-2 text-sm font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all flex items-center gap-2 border border-gray-300"
-        >
-          <span>🎨</span>
-          {showAccessories ? 'Ocultar accesorios' : 'Personalizar accesorios'}
-        </button>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="px-4 py-2 text-sm font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all flex items-center gap-2 border border-gray-300"
+            >
+              <span aria-hidden>🎨</span>
+              Personalizar accesorios
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" className="w-64 p-3">
+            <DropdownMenuLabel className="text-xs font-bold text-gray-600 text-center">
+              Accesorios faciales
+            </DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={selectedAccessories[0]}
+              onValueChange={handleAccessoryChange}
+              className="grid grid-cols-2 gap-2 mt-2"
+            >
+              {ACCESSORY_OPTIONS.map((option) => (
+                <DropdownMenuRadioItem
+                  key={option.value}
+                  value={option.value}
+                  className="h-11 justify-center px-2 text-xs font-bold rounded-lg data-[state=checked]:bg-purple-500 data-[state=checked]:text-white"
+                >
+                  {option.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-
-      {showAccessories && (
-        <div className="bg-gray-50 backdrop-blur-md rounded-2xl p-3 border border-gray-200">
-          <p className="text-gray-600 text-xs mb-2 text-center font-bold">Accesorios faciales</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {ACCESSORY_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => handleAccessoryChange(option.value)}
-                className={`
-                  h-11 px-2 text-xs font-bold rounded-lg leading-tight
-                  flex items-center justify-center text-center
-                  transition-colors duration-150
-                  ${selectedAccessories[0] === option.value
-                    ? 'bg-purple-500 text-white border border-purple-600 shadow-md'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-purple-50 hover:border-purple-300'
-                  }
-                `}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="relative">
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 sm:gap-2">

@@ -1,103 +1,25 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+/**
+ * US-22 — Control de audio flotante (US-20): UI fina.
+ *
+ * Conserva el markup, las clases, el `aria-label`, el popup y el slider
+ * vertical, además del estado puramente visual `expanded`. Toda la lógica de
+ * audio (contexto/playlists, crossfade, autoplay, volumen/mute y persistencia)
+ * vive en `useMusicPlayer`.
+ */
+import { useEffect, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
-
-let audioInstance: HTMLAudioElement | null = null;
-
-function getAudio(): HTMLAudioElement | null {
-  if (typeof window === "undefined") return null;
-  if (!audioInstance) {
-    audioInstance = new Audio("/QuizUp.mp3");
-    audioInstance.loop = true;
-    audioInstance.preload = "auto";
-
-    const savedVolume = localStorage.getItem("quizup-volume");
-    const savedMuted = localStorage.getItem("quizup-muted");
-
-    audioInstance.volume = savedVolume !== null ? Number(savedVolume) / 100 : 0.4;
-    audioInstance.muted = savedMuted !== null ? savedMuted === "true" : true;
-  }
-  return audioInstance;
-}
+import {
+  MUSIC_VOLUME_MAX_PERCENT,
+  MUSIC_VOLUME_MIN_PERCENT,
+} from "@/constants/music";
+import { useMusicPlayer } from "@/hooks/useMusicPlayer";
 
 export function AudioPlayer() {
-  const [muted, setMuted] = useState(true);
-  const [volume, setVolume] = useState(40);
+  const { mounted, muted, volume, toggleMute, handleVolumeChange } =
+    useMusicPlayer();
   const [expanded, setExpanded] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const audio = getAudio();
-    if (!audio) return;
-
-    const savedVolume = localStorage.getItem("quizup-volume");
-    const savedMuted = localStorage.getItem("quizup-muted");
-
-    if (savedVolume !== null) {
-      const v = Number(savedVolume);
-      audio.volume = v / 100;
-      setVolume(v);
-    }
-    if (savedMuted !== null) {
-      const m = savedMuted === "true";
-      audio.muted = m;
-      setMuted(m);
-    }
-
-    setMounted(true);
-
-    const tryPlay = () => {
-      if (audio.paused) {
-        audio.play().catch(() => undefined); // best-effort: el navegador puede bloquear el autoplay
-      }
-    };
-
-    tryPlay();
-
-    const handleInteraction = () => {
-      tryPlay();
-      document.removeEventListener("click", handleInteraction);
-      document.removeEventListener("keydown", handleInteraction);
-    };
-
-    document.addEventListener("click", handleInteraction);
-    document.addEventListener("keydown", handleInteraction);
-
-    return () => {
-      document.removeEventListener("click", handleInteraction);
-      document.removeEventListener("keydown", handleInteraction);
-    };
-  }, []);
-
-  const toggleMute = useCallback(() => {
-    const audio = getAudio();
-    if (!audio) return;
-    audio.muted = !audio.muted;
-    setMuted(audio.muted);
-    localStorage.setItem("quizup-muted", String(audio.muted));
-  }, []);
-
-  const handleVolumeChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const audio = getAudio();
-      if (!audio) return;
-      const val = Number(e.target.value);
-      audio.volume = val / 100;
-      setVolume(val);
-      localStorage.setItem("quizup-volume", String(val));
-      if (val === 0) {
-        audio.muted = true;
-        setMuted(true);
-        localStorage.setItem("quizup-muted", "true");
-      } else if (audio.muted) {
-        audio.muted = false;
-        setMuted(false);
-        localStorage.setItem("quizup-muted", "false");
-      }
-    },
-    []
-  );
 
   useEffect(() => {
     if (!expanded) return;
@@ -141,8 +63,8 @@ export function AudioPlayer() {
       >
         <input
           type="range"
-          min={0}
-          max={100}
+          min={MUSIC_VOLUME_MIN_PERCENT}
+          max={MUSIC_VOLUME_MAX_PERCENT}
           value={volume}
           onChange={handleVolumeChange}
           className="w-10 h-24 cursor-pointer"

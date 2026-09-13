@@ -1,9 +1,11 @@
 "use client"
 
 import { GameForm } from "@/components/GameForm"
+import { useMusicContextPublisher } from "@/hooks/useMusicContext"
 import Link from "next/link"
 
 export default function CreatePage() {
+  useMusicContextPublisher()
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center p-4 py-8">
       <div className="w-full max-w-3xl space-y-6" style={{ animation: "slide-up 0.6s ease-out" }}>

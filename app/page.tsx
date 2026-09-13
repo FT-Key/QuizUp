@@ -1,12 +1,14 @@
 "use client"
 
 import { JoinForm } from "@/components/JoinForm"
+import { useMusicContextPublisher } from "@/hooks/useMusicContext"
 import Link from "next/link"
 
 export default function HomePage() {
+  useMusicContextPublisher()
   return (
-    <div className="h-dvh flex flex-col items-center justify-center p-3 py-4 sm:p-4 sm:py-8">
-      <div className="w-full max-w-md space-y-4 sm:space-y-8" style={{ animation: "slide-up 0.6s ease-out" }}>
+    <div className="min-h-dvh flex flex-col p-3 py-4 sm:p-4 sm:py-8">
+      <div className="w-full max-w-md m-auto space-y-4 sm:space-y-8" style={{ animation: "slide-up 0.6s ease-out" }}>
 
         <div className="text-center space-y-2 sm:space-y-4">
           <div

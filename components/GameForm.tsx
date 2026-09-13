@@ -5,7 +5,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2, Plus } from "lucide-react"
 import { toast } from "sonner"
-import { QUIZ_FILE_LIMITS } from "@/core/domain/quiz-file"
+import { QUIZ_FILE_LIMITS, type SanitizedQuiz } from "@/core/domain/quiz-file"
 import { useQuizDraft } from "@/hooks/useQuizDraft"
 import { buildCreateGamePayload } from "@/core/application/builders/quiz-builder"
 import { QuestionEditor } from "./game-form/QuestionEditor"
@@ -15,6 +15,7 @@ import { QuizFileActions } from "./game-form/QuizFileActions"
 export function GameForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [openIndex, setOpenIndex] = useState<number | null>(0)
   const {
     draft,
     isValid,
@@ -28,6 +29,26 @@ export function GameForm() {
     setQuestionImage,
     importQuiz,
   } = useQuizDraft()
+
+  const handleAddQuestion = () => {
+    setOpenIndex(draft.questions.length) // índice de la nueva
+    addQuestion()
+  }
+
+  const handleRemoveQuestion = (index: number) => {
+    setOpenIndex((prev) => {
+      if (prev === null) return null
+      if (prev === index) return Math.min(index, draft.questions.length - 2)
+      if (prev > index) return prev - 1
+      return prev
+    })
+    removeQuestion(index)
+  }
+
+  const handleImport = (quiz: SanitizedQuiz) => {
+    importQuiz(quiz)
+    setOpenIndex(0)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -96,11 +117,11 @@ export function GameForm() {
           </h2>
           <div className="flex items-center gap-2">
 
-            <QuizFileActions draft={draft} onImport={importQuiz} />
+            <QuizFileActions draft={draft} onImport={handleImport} canExport={isValid} />
 
             <button
               type="button"
-              onClick={addQuestion}
+              onClick={handleAddQuestion}
               className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-xl transition-all hover:scale-105"
               style={{
                 background: "linear-gradient(135deg, #864CBF 0%, #46178F 100%)",
@@ -118,7 +139,11 @@ export function GameForm() {
             index={questionIndex}
             question={question}
             canRemove={draft.questions.length > 1}
-            onRemove={() => removeQuestion(questionIndex)}
+            isOpen={openIndex === questionIndex}
+            onToggle={() =>
+              setOpenIndex((prev) => (prev === questionIndex ? null : questionIndex))
+            }
+            onRemove={() => handleRemoveQuestion(questionIndex)}
             onTextChange={(text) => setQuestionText(questionIndex, text)}
             onOptionChange={(optionIndex, value) =>
               setOption(questionIndex, optionIndex, value)

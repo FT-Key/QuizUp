@@ -8,6 +8,7 @@ import { AdminPresentation } from "@/components/admin/AdminPresentation";
 import { useAdminSocket } from "@/hooks/useAdminSocket";
 import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 import { useAdminActions } from "@/hooks/useAdminActions";
+import { useMusicContextPublisher } from "@/hooks/useMusicContext";
 import { withErrorBoundary } from "@/components/withErrorBoundary";
 import { GAME_STATUS } from "@/core/domain/game/constants";
 import { FALLBACK_QUESTION_TIME_LIMIT_MS } from "@/constants/game";
@@ -36,6 +37,8 @@ function AdminPage() {
     toggleLock,
     closeGame,
   } = useAdminActions({ gameId: gameId as string, game, setGame, emit });
+
+  useMusicContextPublisher(game?.status, true);
 
   if (loading || !game) {
     return (
