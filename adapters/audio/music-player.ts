@@ -14,9 +14,12 @@
  * - `setMuted` solo toca el silencio global; los fades siguen moviendo la
  *   ganancia interna para que al desmutear no haya salto (D-D.3).
  *
- * El mixer se crea de forma perezosa en el primer `play()` (gesto), nunca en el
- * montaje, para evitar el warning de Chrome (AC7).
+ * El mixer (y con él el `AudioContext`) se crea de forma perezosa en `unlock()`,
+ * llamado desde el primer gesto (`click`/`keydown`) del hook. `play()` nunca lo
+ * crea: en el montaje solo intenta `element.play()` best-effort y aplica
+ * volumen/mute con la vía disponible, evitando el warning de Chrome (AC7).
  */
+import { clamp01 } from "./clamp";
 import {
   MUSIC_DEFAULT_VOLUME,
   MUSIC_FADE_MS,
@@ -38,7 +41,15 @@ export interface MusicPlayer {
   setMuted(muted: boolean): void;
   getTargetVolume(): number;
   isMuted(): boolean;
-  /** Arranca/reintenta la reproducción best-effort; reanuda el mixer (gesto). */
+  /**
+   * Crea el mixer perezosamente y lo reanuda. Es el **único** punto que crea el
+   * `AudioContext`; se llama desde el primer gesto (`click`/`keydown`).
+   */
+  unlock(): Promise<void>;
+  /**
+   * Arranca/reintenta la reproducción best-effort **sin crear el mixer**: aplica
+   * volumen/mute por la vía disponible y reintenta `element.play()`.
+   */
   play(): Promise<void>;
   /** Corta fades y pausa (tests/teardown). No se llama en navegación normal. */
   dispose(): void;
@@ -53,12 +64,6 @@ export interface MusicPlayerDeps {
 }
 
 type ActiveFade = "in" | "out" | null;
-
-/** Acota a [0, 1]; NaN se trata como 0. */
-function clamp01(value: number): number {
-  if (Number.isNaN(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}
 
 export function createMusicPlayer(deps: MusicPlayerDeps = {}): MusicPlayer {
   const createElement =
@@ -79,6 +84,8 @@ export function createMusicPlayer(deps: MusicPlayerDeps = {}): MusicPlayer {
   let activeFade: ActiveFade = null;
   let fadeGeneration = 0;
   let fadeTimer: ReturnType<typeof setInterval> | null = null;
+  /** true mientras un cambio de contexto está en curso (fade-out → swap). */
+  let contextTransition = false;
 
   function getPlaylist(musicContext: MusicContext): readonly string[] {
     return playlists[musicContext];
@@ -98,10 +105,23 @@ export function createMusicPlayer(deps: MusicPlayerDeps = {}): MusicPlayer {
     activeFade = null;
   }
 
-  /** Aplica la ganancia de pista; si el mixer aún no existe, queda guardada. */
+  /**
+   * Aplica la ganancia de pista. Con mixer, mueve el `GainNode`; sin mixer, usa
+   * `element.volume` como control de trabajo hasta que el gesto cree el mixer.
+   */
   function applyTrackGain(value: number): void {
     trackGain = value;
-    mixer?.setTrackGain(value);
+    if (mixer !== null) {
+      mixer.setTrackGain(value);
+    } else if (element !== null) {
+      element.volume = clamp01(value);
+    }
+  }
+
+  /** Aplica el estado guardado (volumen/mute) al elemento cuando no hay mixer. */
+  function applyElementFallback(audio: HTMLAudioElement): void {
+    audio.volume = clamp01(trackGain);
+    audio.muted = muted;
   }
 
   function ensureElement(): HTMLAudioElement {
@@ -118,7 +138,10 @@ export function createMusicPlayer(deps: MusicPlayerDeps = {}): MusicPlayer {
     return created;
   }
 
-  /** Crea el mixer en el primer gesto y le aplica el estado guardado. */
+  /**
+   * Crea el mixer en el primer gesto (único punto que instancia el
+   * `AudioContext`) y le aplica el estado guardado.
+   */
   function ensureMixer(): AudioMixer {
     if (mixer !== null) return mixer;
 
@@ -127,6 +150,16 @@ export function createMusicPlayer(deps: MusicPlayerDeps = {}): MusicPlayer {
     created.setTrackGain(trackGain);
     mixer = created;
     return created;
+  }
+
+  /** Reanuda el mixer; no-op si aún no existe. `resume()` es best-effort. */
+  async function resumeMixer(): Promise<void> {
+    if (mixer === null) return;
+    try {
+      await mixer.resume();
+    } catch {
+      // resume() puede rechazar si el gesto no alcanza; best-effort (AC7).
+    }
   }
 
   async function tryPlay(audio: HTMLAudioElement): Promise<void> {
@@ -197,6 +230,10 @@ export function createMusicPlayer(deps: MusicPlayerDeps = {}): MusicPlayer {
   }
 
   function handleEnded(): void {
+    // El `ended` de la pista saliente dentro de la ventana de fade-out no debe
+    // avanzar la playlist nueva (saltaría la 1.ª pista).
+    if (contextTransition) return;
+
     const playlist = getPlaylist(context);
     playTrackAt(nextTrackIndex(currentIndex, playlist.length));
   }
@@ -213,7 +250,9 @@ export function createMusicPlayer(deps: MusicPlayerDeps = {}): MusicPlayer {
     const src = getPlaylist(nextContext)[0];
     if (src === undefined) return;
 
+    contextTransition = true;
     startFadeOut(fadeMs, () => {
+      contextTransition = false;
       audio.src = src;
       audio.currentTime = 0;
       void tryPlay(audio);
@@ -229,26 +268,38 @@ export function createMusicPlayer(deps: MusicPlayerDeps = {}): MusicPlayer {
 
   function setMuted(nextMuted: boolean): void {
     muted = nextMuted;
-    mixer?.setSilent(muted);
+    if (mixer !== null) {
+      mixer.setSilent(muted);
+    } else if (element !== null) {
+      element.muted = muted;
+    }
+  }
+
+  /** Único punto que crea el mixer; se llama desde el primer gesto. */
+  function unlock(): Promise<void> {
+    ensureMixer();
+    return resumeMixer();
   }
 
   function play(): Promise<void> {
     const audio = ensureElement();
-    ensureMixer();
+    // `play()` nunca crea el mixer. Aplica volumen/mute por la vía disponible:
+    // con mixer, los `GainNode`; sin mixer, el elemento como control de trabajo.
+    if (mixer !== null) {
+      mixer.setSilent(muted);
+      mixer.setTrackGain(trackGain);
+    } else {
+      applyElementFallback(audio);
+    }
     // `play()` del elemento es best-effort y no se espera: el navegador puede
     // bloquear el autoplay y la promesa quedaría colgada (AC7).
     if (audio.paused) void tryPlay(audio);
-    return (async () => {
-      try {
-        await mixer?.resume();
-      } catch {
-        // resume() puede rechazar si el gesto no alcanza; best-effort.
-      }
-    })();
+    return Promise.resolve();
   }
 
   function dispose(): void {
     cancelFade();
+    contextTransition = false;
     if (element !== null) {
       element.removeEventListener("ended", handleEnded);
       element.pause();
@@ -263,6 +314,7 @@ export function createMusicPlayer(deps: MusicPlayerDeps = {}): MusicPlayer {
     setMuted,
     getTargetVolume: () => targetVolume,
     isMuted: () => muted,
+    unlock,
     play,
     dispose,
   };

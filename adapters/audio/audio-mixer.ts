@@ -11,6 +11,7 @@
  * El adapter no decide cuándo ni a qué ritmo mover la ganancia: eso es del
  * `MusicPlayer`. Aquí solo se traduce `setTrackGain`/`setSilent`/`resume`.
  */
+import { clamp01 } from "./clamp";
 
 export interface AudioMixer {
   /** Ganancia de la pista activa (0..1); la mueve el fade. */
@@ -23,12 +24,6 @@ export interface AudioMixer {
 }
 
 type AudioContextConstructor = new () => AudioContext;
-
-/** Acota a [0, 1]; NaN se trata como 0 para no propagar un valor inválido. */
-function clamp01(value: number): number {
-  if (Number.isNaN(value)) return 0;
-  return Math.min(1, Math.max(0, value));
-}
 
 /**
  * Resuelve el constructor de `AudioContext` del navegador
@@ -57,6 +52,11 @@ function createWebAudioMixer(
   source.connect(trackGain);
   trackGain.connect(masterGain);
   masterGain.connect(context.destination);
+
+  // Con Web Audio los `GainNode` son la única fuente de verdad: se neutraliza
+  // el control a nivel de elemento para no atenuar dos veces.
+  element.volume = 1;
+  element.muted = false;
 
   return {
     usingWebAudio: true,

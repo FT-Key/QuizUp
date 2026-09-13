@@ -29,18 +29,33 @@ interface PlayerHarness {
   element: FakeAudioElement;
   mixer: FakeAudioMixer;
   player: MusicPlayer;
+  createMixer: ReturnType<typeof vi.fn>;
 }
 
 /** Crea un player con fakes inyectados y una playlist opcional propia. */
 function setup(deps: Partial<MusicPlayerDeps> = {}): PlayerHarness {
   const element = new FakeAudioElement();
   const mixer = new FakeAudioMixer();
+  const createMixer = vi.fn(() => mixer);
   const player = createMusicPlayer({
     createElement: () => asElement(element),
-    createMixer: () => mixer,
+    createMixer,
     ...deps,
   });
-  return { element, mixer, player };
+  return { element, mixer, player, createMixer };
+}
+
+/**
+ * Simula el arranque real: montaje (`play()` best-effort) seguido del primer
+ * gesto (`unlock()`), que es el único que crea el mixer.
+ */
+async function startWithGesture(
+  player: MusicPlayer,
+  element: FakeAudioElement
+): Promise<void> {
+  await player.play();
+  element.resolvePlay();
+  await player.unlock();
 }
 
 afterEach(() => {
@@ -71,8 +86,7 @@ describe("createMusicPlayer — arranque y contexto", () => {
   it("setContext('game') con audio arrancado: fade-out, cambia a QuizUp y fade-in al target", async () => {
     const timers = fakeTimers();
     const { element, mixer, player } = setup();
-    await player.play();
-    element.resolvePlay();
+    await startWithGesture(player, element);
 
     player.setContext("game");
     await timers.advanceAsync(FADE); // fade-out hasta 0
@@ -87,7 +101,7 @@ describe("createMusicPlayer — arranque y contexto", () => {
   it("setContext con el mismo contexto es no-op (sin fade ni play extra)", async () => {
     const timers = fakeTimers();
     const { element, mixer, player } = setup();
-    await player.play();
+    await startWithGesture(player, element);
     const playsBefore = element.playCallCount;
     const gainsBefore = mixer.trackGains.length;
 
@@ -113,8 +127,7 @@ describe("createMusicPlayer — arranque y contexto", () => {
   it("dos cambios rápidos de contexto cancelan el fade anterior: 1 pista, target final, sin timers", async () => {
     const timers = fakeTimers();
     const { element, mixer, player } = setup();
-    await player.play();
-    element.resolvePlay();
+    await startWithGesture(player, element);
 
     player.setContext("game");
     await timers.advanceAsync(FADE / 2);
@@ -126,14 +139,29 @@ describe("createMusicPlayer — arranque y contexto", () => {
     expect(mixer.lastTrackGain).toBeCloseTo(MUSIC_DEFAULT_VOLUME, 5);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it("un ended de la pista saliente durante el fade-out de contexto no salta la 1.ª pista nueva", async () => {
+    const timers = fakeTimers();
+    const { element, player } = setup();
+    await startWithGesture(player, element);
+
+    player.setContext("game");
+    await timers.advanceAsync(FADE / 2); // a mitad del fade-out
+    element.emitEnded(); // la pista vieja termina durante la transición
+    await timers.advanceAsync(FADE); // completa el fade-out y arranca el fade-in
+
+    expect(element.src).toContain("/music/QuizUp.mp3"); // 1.ª pista, no QuizUp2
+
+    await timers.advanceAsync(FADE); // completa el fade-in
+    expect(element.src).toContain("/music/QuizUp.mp3");
+  });
 });
 
 describe("createMusicPlayer — avance de playlist", () => {
   it("emitEnded avanza a la siguiente pista y hace wrap al inicio", async () => {
     const timers = fakeTimers();
     const { element, mixer, player } = setup();
-    await player.play();
-    element.resolvePlay();
+    await startWithGesture(player, element);
 
     element.emitEnded();
     await timers.advanceAsync(FADE);
@@ -172,23 +200,40 @@ describe("createMusicPlayer — avance de playlist", () => {
 });
 
 describe("createMusicPlayer — volumen y mute", () => {
-  it("el mixer se crea en el primer play() y recibe el estado guardado", async () => {
-    const { mixer, player } = setup();
+  it("play() (montaje) no crea el mixer; unlock() (gesto) lo crea con el estado guardado", async () => {
+    const { element, mixer, player, createMixer } = setup();
 
     player.setTargetVolume(0.6);
     player.setMuted(false);
-    expect(mixer.trackGains).toHaveLength(0);
 
     await player.play();
 
+    expect(createMixer).not.toHaveBeenCalled();
+    expect(mixer.trackGains).toHaveLength(0);
+    // Sin mixer, el volumen/mute de trabajo vive en el elemento (fallback).
+    expect(element.volume).toBeCloseTo(0.6, 5);
+    expect(element.muted).toBe(false);
+
+    await player.unlock();
+
+    expect(createMixer).toHaveBeenCalledTimes(1);
     expect(mixer.trackGains[0]).toBeCloseTo(0.6, 5);
     expect(mixer.silentStates[0]).toBe(false);
     expect(mixer.resumeCallCount).toBe(1);
   });
 
+  it("unlock() es idempotente: no recrea el mixer en gestos posteriores", async () => {
+    const { player, createMixer } = setup();
+
+    await player.unlock();
+    await player.unlock();
+
+    expect(createMixer).toHaveBeenCalledTimes(1);
+  });
+
   it("setTargetVolume sin fade aplica de inmediato y acota a [0,1]", async () => {
-    const { mixer, player } = setup();
-    await player.play();
+    const { element, mixer, player } = setup();
+    await startWithGesture(player, element);
 
     player.setTargetVolume(0.7);
     expect(mixer.lastTrackGain).toBeCloseTo(0.7, 5);
@@ -203,8 +248,7 @@ describe("createMusicPlayer — volumen y mute", () => {
   it("muted: el fade mueve la ganancia interna y al desmutear no hay salto", async () => {
     const timers = fakeTimers();
     const { element, mixer, player } = setup();
-    await player.play();
-    element.resolvePlay();
+    await startWithGesture(player, element);
     player.setMuted(true);
 
     player.setContext("game");
@@ -222,8 +266,7 @@ describe("createMusicPlayer — volumen y mute", () => {
   it("setTargetVolume durante el fade-in dirige el destino al nuevo valor (D-F.1)", async () => {
     const timers = fakeTimers();
     const { element, mixer, player } = setup();
-    await player.play();
-    element.resolvePlay();
+    await startWithGesture(player, element);
 
     player.setContext("game");
     await timers.advanceAsync(FADE); // termina el fade-out, arranca el fade-in

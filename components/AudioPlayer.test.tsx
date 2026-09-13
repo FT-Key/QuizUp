@@ -31,6 +31,7 @@ import type { MusicPlayer } from "@/adapters/audio/music-player";
 import { MUSIC_FADE_MS } from "@/constants/music";
 import type { GameStatus } from "@/core/domain/game";
 import { createAudioStub, type AudioStub } from "@/tests/fakes/audio";
+import { FakeAudioContext } from "@/tests/fakes/audio-context";
 
 type PublisherHook = (
   gameStatus?: GameStatus | null,
@@ -72,6 +73,18 @@ function PublisherProbe({ usePublisher, status }: PublisherProbeProps) {
   return null;
 }
 
+type AudioContextWindow = { AudioContext?: unknown };
+
+/** Instala el `AudioContext` global sin reemplazar `window` (jsdom). */
+function setGlobalAudioContext(ctor: unknown): void {
+  (window as unknown as AudioContextWindow).AudioContext = ctor;
+}
+
+/** Retira el `AudioContext` global para que cada test vuelva al fallback. */
+function clearGlobalAudioContext(): void {
+  delete (window as unknown as AudioContextWindow).AudioContext;
+}
+
 beforeEach(async () => {
   localStorage.clear();
   stub = createAudioStub();
@@ -82,6 +95,7 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  clearGlobalAudioContext();
   vi.unstubAllGlobals();
   vi.resetModules();
   vi.restoreAllMocks();
@@ -130,41 +144,49 @@ describe("AudioPlayer — montaje y control", () => {
 });
 
 describe("AudioPlayer — autoplay best-effort (AC7)", () => {
-  it("el primer click reintenta play() y desengancha click/keydown", () => {
+  it("el primer click reintenta play() y desbloquea el mixer, luego desengancha", () => {
     const player = loaded.getMusicPlayer();
     const playSpy = vi.spyOn(player, "play");
+    const unlockSpy = vi.spyOn(player, "unlock");
     render(<loaded.AudioPlayer />);
     const audio = stub.last();
     expect(playSpy).toHaveBeenCalledTimes(1);
+    expect(unlockSpy).not.toHaveBeenCalled();
     expect(audio.playCallCount).toBe(1);
 
     document.dispatchEvent(new Event("click"));
     expect(playSpy).toHaveBeenCalledTimes(2);
+    expect(unlockSpy).toHaveBeenCalledTimes(1);
     expect(audio.playCallCount).toBe(2);
 
     // Ya se quitaron los listeners: ni otro click ni un keydown reintentan.
     document.dispatchEvent(new Event("click"));
     document.dispatchEvent(new Event("keydown"));
     expect(playSpy).toHaveBeenCalledTimes(2);
+    expect(unlockSpy).toHaveBeenCalledTimes(1);
     expect(audio.playCallCount).toBe(2);
   });
 
   it("el primer keydown también desbloquea (y limpia ambos listeners)", () => {
     const player = loaded.getMusicPlayer();
     const playSpy = vi.spyOn(player, "play");
+    const unlockSpy = vi.spyOn(player, "unlock");
     render(<loaded.AudioPlayer />);
     expect(playSpy).toHaveBeenCalledTimes(1);
 
     document.dispatchEvent(new Event("keydown"));
     expect(playSpy).toHaveBeenCalledTimes(2);
+    expect(unlockSpy).toHaveBeenCalledTimes(1);
 
     document.dispatchEvent(new Event("click"));
     expect(playSpy).toHaveBeenCalledTimes(2);
+    expect(unlockSpy).toHaveBeenCalledTimes(1);
   });
 
   it("al desmontar se limpian los listeners: un click posterior no reintenta", () => {
     const player = loaded.getMusicPlayer();
     const playSpy = vi.spyOn(player, "play");
+    const unlockSpy = vi.spyOn(player, "unlock");
     const { unmount } = render(<loaded.AudioPlayer />);
     expect(playSpy).toHaveBeenCalledTimes(1);
 
@@ -173,6 +195,23 @@ describe("AudioPlayer — autoplay best-effort (AC7)", () => {
     document.dispatchEvent(new Event("keydown"));
 
     expect(playSpy).toHaveBeenCalledTimes(1);
+    expect(unlockSpy).not.toHaveBeenCalled();
+  });
+
+  it("no instancia AudioContext en el montaje; sí en el primer gesto (AC7)", () => {
+    FakeAudioContext.reset();
+    setGlobalAudioContext(FakeAudioContext);
+    try {
+      render(<loaded.AudioPlayer />);
+      expect(FakeAudioContext.instances).toHaveLength(0);
+
+      document.dispatchEvent(new Event("click"));
+
+      expect(FakeAudioContext.instances).toHaveLength(1);
+      expect(FakeAudioContext.instances[0].resumeCallCount).toBe(1);
+    } finally {
+      clearGlobalAudioContext();
+    }
   });
 
   it("un play() rechazado no rompe el control ni deja promesa sin manejar", async () => {
@@ -265,6 +304,27 @@ describe("AudioPlayer — volumen y mute (US-20/AC6)", () => {
     expect(localStorage.getItem("quizup-muted")).toBe("false");
     expect(stub.last().volume).toBe(1);
   });
+
+  it.each([
+    ["150", "100", 1],
+    ["-20", "0", 0],
+    ["no-numero", "40", 0.4],
+  ])(
+    "acota quizup-volume=%s al rango del slider (%s)",
+    (saved, expectedSlider, expectedTarget) => {
+      localStorage.setItem("quizup-volume", saved);
+
+      render(<loaded.AudioPlayer />);
+
+      expect((screen.getByRole("slider") as HTMLInputElement).value).toBe(
+        expectedSlider
+      );
+      expect(loaded.getMusicPlayer().getTargetVolume()).toBeCloseTo(
+        expectedTarget,
+        5
+      );
+    }
+  );
 
   it("el botón alterna el mute, actualiza aria-label y persiste quizup-muted", () => {
     render(<loaded.AudioPlayer />);

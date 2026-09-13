@@ -10,8 +10,9 @@
  *   `MUSIC_DEFAULT_VOLUME`/mute) y los aplica al player; arranca la
  *   reproducción best-effort.
  * - Autoplay: registra un único desbloqueo en el primer `click`/`keydown` de
- *   `document` (`player.play()` resume el mixer y reintenta el elemento) y
- *   limpia los listeners al desmontar (AC7).
+ *   `document` (`player.unlock()` crea el mixer/`AudioContext` y lo reanuda;
+ *   `player.play()` reintenta el elemento) y limpia los listeners al desmontar
+ *   (AC7). El mixer nunca se crea en el montaje.
  * - Contexto: un efecto publica en el player el contexto del store suscriptor
  *   (`useMusicContext`), que provoca el crossfade (AC3/AC4).
  * - Slider: persiste `quizup-volume` y conserva la semántica de US-20
@@ -45,13 +46,19 @@ function toFraction(percent: number): number {
 /** Volumen por defecto del slider, en porcentaje. */
 const DEFAULT_VOLUME_PERCENT = MUSIC_DEFAULT_VOLUME * MUSIC_VOLUME_MAX_PERCENT;
 
-/** Lee `quizup-volume` (0..100); un valor ausente o inválido cae al default. */
+/** Lee `quizup-volume` (0..100); ausente/inválido cae al default y se acota al rango. */
 function readSavedVolume(): number {
   const saved = localStorage.getItem(MUSIC_VOLUME_STORAGE_KEY);
   if (saved === null) return DEFAULT_VOLUME_PERCENT;
 
   const parsed = Number(saved);
-  return Number.isNaN(parsed) ? DEFAULT_VOLUME_PERCENT : parsed;
+  if (Number.isNaN(parsed)) return DEFAULT_VOLUME_PERCENT;
+
+  const clamped = Math.min(
+    MUSIC_VOLUME_MAX_PERCENT,
+    Math.max(MUSIC_VOLUME_MIN_PERCENT, parsed)
+  );
+  return clamped;
 }
 
 /** Lee `quizup-muted`; ausente ⇒ mute (default de US-20). */
@@ -81,7 +88,9 @@ export function useMusicPlayer(): UseMusicPlayerResult {
     void player.play();
 
     const unlock = () => {
-      // `play()` reanuda el mixer y reintenta el elemento (best-effort, AC7).
+      // El primer gesto crea el mixer (`AudioContext`) y lo reanuda; `play()`
+      // reintenta el elemento (best-effort, AC7).
+      void player.unlock();
       void player.play();
       document.removeEventListener("click", unlock);
       document.removeEventListener("keydown", unlock);

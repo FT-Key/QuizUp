@@ -47,6 +47,18 @@ describe("createAudioMixer — Web Audio primario y fallback", () => {
     expect(context.resumeCallCount).toBe(1);
   });
 
+  it("Web Audio neutraliza volume/muted del elemento (GainNode como única fuente)", () => {
+    vi.stubGlobal("window", { AudioContext: FakeAudioContext });
+    const element = new FakeAudioElement();
+    element.volume = 0.3;
+    element.muted = true;
+
+    createAudioMixer(asElement(element));
+
+    expect(element.volume).toBe(1);
+    expect(element.muted).toBe(false);
+  });
+
   it("Web Audio: setTrackGain acota a [0,1]", () => {
     vi.stubGlobal("window", { AudioContext: FakeAudioContext });
     const mixer = createAudioMixer(asElement(new FakeAudioElement()));
