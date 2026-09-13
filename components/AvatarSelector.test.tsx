@@ -1,11 +1,12 @@
 /**
- * CARACTERIZACIÓN US-21 (H1) — `components/AvatarSelector.tsx`.
+ * CARACTERIZACIÓN US-21 (H1b) — `components/AvatarSelector.tsx`.
  *
- * Congela:
+ * Actualizado intencionalmente en US-21 (H1b). Congela el comportamiento nuevo:
  * - la grilla de avatares (16 por página de 32),
  * - `onSelect(seed, accessories)` al elegir un seed,
- * - el toggle de accesorios que HOY inserta el panel "Accesorios faciales" en
- *   el flujo del componente — H1 lo convertirá en dropdown/popover,
+ * - el toggle de accesorios como dropdown/popover portaled con `aria-expanded`,
+ *   que ya NO inserta el panel "Accesorios faciales" en el flujo del componente
+ *   (por eso no provoca reflow),
  * - seleccionar "Gafas de sol" actualiza los accesorios.
  *
  * Renderiza el `Avatar` real (DiceBear) y usa localStorage vacío; sin red.

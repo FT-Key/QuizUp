@@ -1,13 +1,13 @@
 /**
  * CARACTERIZACIÓN US-21 (H2/H3) — `components/QuestionCard.tsx`.
  *
- * Congela:
+ * Actualizado intencionalmente en US-21. Congela el comportamiento nuevo:
  * - la pregunta y sus 4 opciones,
  * - que un click responde UNA sola vez y el segundo no reenvía,
- * - la grilla `grid-cols-1 sm:grid-cols-2` (1 columna en mobile) — H3 la
- *   pasará a 2×2 también en mobile,
- * - el texto "Sending your answer..." mientras el submit está pendiente — H2
- *   lo quitará junto con el overlay de check.
+ * - la grilla 2×2 también en mobile (`grid-cols-2`, sin `grid-cols-1`) — H3,
+ * - que el submit dejó de ser async y ya NO existen el texto
+ *   "Sending your answer..." ni el overlay de check (fondo blanco circular con
+ *   el check SVG) — H2.
  *
  * NOTA DE ENTORNO: ver `JoinForm.test.tsx` (`oxc.jsx` en `vitest.config.ts`).
  */
@@ -73,9 +73,16 @@ describe("QuestionCard (caracterización US-21 H2/H3)", () => {
   });
 
   it("no muestra overlay de check ni 'Sending your answer...' (H2)", () => {
-    render(<QuestionCard question={question} onAnswerSubmit={vi.fn()} />);
+    const { container } = render(
+      <QuestionCard question={question} onAnswerSubmit={vi.fn()} />
+    );
     fireEvent.click(optionButtons()[0]);
 
     expect(screen.queryByText("Sending your answer...")).toBeNull();
+    // El overlay de check (contenedor blanco circular + check SVG) ya no existe.
+    expect(container.querySelector("div.bg-white.rounded-full")).toBeNull();
+    expect(
+      container.querySelector('svg path[d="M5 13l4 4L19 7"]')
+    ).toBeNull();
   });
 });

@@ -1,13 +1,12 @@
 /**
  * CARACTERIZACIÓN US-21 (H5) — `components/game-form/QuestionEditor.tsx`.
  *
- * Congela el editor ACTUAL: header "Question N", textarea, 4 inputs de opciones
- * (Red/Blue/Green/Yellow), botón de marcar correcta, botón de eliminar solo con
- * `canRemove`, y el resumen "Correct answer: <color>". Los callbacks reciben los
- * argumentos correctos.
- *
- * US-21 (H5) agregará un acordeón (contenido plegable): hoy todo el contenido de
- * cualquier pregunta se renderiza expandido sin interacción.
+ * Actualizado intencionalmente en US-21 (H5). Congela el editor con acordeón:
+ * header "Question N" que expone `aria-expanded` y llama `onToggle`, contenido
+ * plegable según `isOpen` (textarea, 4 inputs Red/Blue/Green/Yellow, botón de
+ * marcar correcta, botón de eliminar solo con `canRemove` y resumen
+ * "Correct answer: <color>"), y que los callbacks reciben los argumentos
+ * correctos.
  *
  * `ImagePicker` (Radix Dialog cerrado) se renderiza real y no fetchea al montar.
  *

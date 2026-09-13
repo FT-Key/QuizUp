@@ -19,7 +19,10 @@ export function AnswerPanel({
   isQuestionFinished,
   onAnswerSubmit,
 }: AnswerPanelProps) {
-  if (hasSubmitted && !isQuestionFinished) {
+  // Si ya envió, se muestra la espera aunque `isQuestionFinished` sea true: el
+  // hook marca `allAnswered` en `game-updated` antes de que `question-finished`
+  // cambie la fase a `showing-result`; si no, el área queda en blanco un tick.
+  if (hasSubmitted) {
     return (
       <div
         className="bg-white rounded-3xl shadow-xl p-8 text-center"

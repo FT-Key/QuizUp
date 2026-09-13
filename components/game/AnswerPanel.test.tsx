@@ -1,10 +1,14 @@
 /**
  * CARACTERIZACIÓN US-21 (H2) — `components/game/AnswerPanel.tsx`.
  *
- * Congela el comportamiento ACTUAL previo a H2: al enviar la respuesta se
- * muestra una confirmación transitoria con check (✅) y el texto
- * "¡Respuesta enviada! / Esperando a los demás jugadores...". US-21 eliminará
- * el check y mostrará directamente el mensaje de espera.
+ * Actualizado intencionalmente en US-21 (H2): se eliminó la confirmación
+ * transitoria con check (✅) y ahora, apenas `hasSubmitted` es true, se muestra
+ * directamente el mensaje de espera.
+ *
+ * Además se congeló la corrección de review de US-21: la espera se muestra
+ * SIEMPRE que `hasSubmitted`, incluso cuando `isQuestionFinished` ya es true
+ * (el hook marca `allAnswered` un tick antes de pasar a `showing-result`). El
+ * `null` queda solo para quien no envió y la pregunta terminó o no existe.
  *
  * `QuestionCard` se mockea para aislar el panel; su propio comportamiento se
  * caracteriza en `components/QuestionCard.test.tsx`.
@@ -69,8 +73,8 @@ describe("AnswerPanel (caracterización US-21 H2)", () => {
     expect(mocks.submit).not.toHaveBeenCalled();
   });
 
-  it("con hasSubmitted y pregunta terminada devuelve null (la página muestra ResultPanel)", () => {
-    const { container } = render(
+  it("con hasSubmitted y pregunta terminada sigue mostrando la espera (regresión: evita el blanco antes de ResultPanel)", () => {
+    render(
       <AnswerPanel
         question={QUESTION}
         hasSubmitted
@@ -79,7 +83,11 @@ describe("AnswerPanel (caracterización US-21 H2)", () => {
       />
     );
 
-    expect(container.firstChild).toBeNull();
+    expect(
+      screen.getByText("Esperando respuestas de los demás jugadores…")
+    ).toBeTruthy();
+    expect(screen.queryByText(/stub-question-card/)).toBeNull();
+    expect(mocks.submit).not.toHaveBeenCalled();
   });
 
   it("con isQuestionFinished y sin result devuelve null", () => {
