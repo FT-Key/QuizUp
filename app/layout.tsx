@@ -33,7 +33,7 @@ export default function RootLayout({
     >
       <body className="min-h-dvh overflow-x-hidden">
         <div
-          className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
+          className="fixed inset-x-0 top-0 h-lvh bg-cover bg-center bg-no-repeat -z-10"
           style={{
             backgroundImage: "url('/background-quizup.png')",
             filter: "blur(2px)"

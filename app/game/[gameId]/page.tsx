@@ -54,9 +54,9 @@ function GamePage() {
 
   if (!player) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-dvh flex p-4">
         <div
-          className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8"
+          className="w-full max-w-md m-auto bg-white rounded-3xl shadow-2xl p-8"
           style={{ animation: "bounce-in 0.6s ease-out" }}
         >
           <h2 className="text-2xl font-black text-center text-gray-800 mb-6">
