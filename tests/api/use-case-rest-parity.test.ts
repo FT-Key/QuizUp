@@ -597,8 +597,10 @@ describe("paridad REST: pipeline US-11 (fake + use cases + mapper)", () => {
     const raw = await useCase.execute({ gameId: "123456" });
 
     // El caso de uso devuelve el porcentaje CRUDO; el DTO redondea.
-    expect(raw.leaderboard[0].percentage).toBeCloseTo(33.33333333333333);
-    expect(raw.leaderboard[1].percentage).toBeCloseTo(66.66666666666666);
+    // US-20: Beto (101) lidera por score desc; Ana (100) queda segundo.
+    expect(raw.leaderboard[0].playerId).toBe("p2");
+    expect(raw.leaderboard[0].percentage).toBeCloseTo(66.66666666666666);
+    expect(raw.leaderboard[1].percentage).toBeCloseTo(33.33333333333333);
     expect(raw.averageScore).toBe(100.5);
 
     const response = { results: toResultsDto(raw) };
@@ -611,21 +613,21 @@ describe("paridad REST: pipeline US-11 (fake + use cases + mapper)", () => {
         totalQuestions: 3,
         leaderboard: [
           {
-            playerId: "p1",
-            name: "Ana",
-            score: 100,
-            correctAnswers: 1,
-            totalQuestions: 3,
-            percentage: 33,
-            avatar: undefined,
-          },
-          {
             playerId: "p2",
             name: "Beto",
             score: 101,
             correctAnswers: 2,
             totalQuestions: 3,
             percentage: 67,
+            avatar: undefined,
+          },
+          {
+            playerId: "p1",
+            name: "Ana",
+            score: 100,
+            correctAnswers: 1,
+            totalQuestions: 3,
+            percentage: 33,
             avatar: undefined,
           },
         ],

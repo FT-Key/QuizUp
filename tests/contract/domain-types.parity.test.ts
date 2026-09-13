@@ -37,6 +37,8 @@ const legacyPlayer: LegacyPlayer = {
   name: "Jugador legacy",
   gameId: "g-1",
   answers: {},
+  // US-20: campo aditivo opcional, espejo dominio ↔ legacy.
+  answerTimesMs: { "q-1": 1500 },
   score: 0,
   joinedAt: new Date(0),
 };
@@ -68,6 +70,7 @@ const legacyResults: LegacyGameResults = {
       totalQuestions: 1,
       percentage: 0,
       avatar: undefined,
+      totalTimeMs: 1500,
     },
   ],
 };
@@ -84,7 +87,11 @@ const domainGame = new ResultsBuilder()
   .withId("g-1")
   .withStatus("waiting")
   .withQuestions(domainQuestion)
-  .withPlayer({ id: "p-1", name: "Jugador legacy" })
+  .withPlayer({
+    id: "p-1",
+    name: "Jugador legacy",
+    answerTimesMs: { "q-1": 1500 },
+  })
   .build();
 const domainPlayer = domainGame.players[0];
 const domainResults: GameResults = calculateResults(domainGame);
@@ -100,5 +107,8 @@ describe("paridad estructural legacy ↔ dominio (compile-time)", () => {
     expect(gameFromLegacy.id).toBe(gameToLegacy.id);
     expect(resultsFromLegacy.gameId).toBe(resultsToLegacy.gameId);
     expect(domainResults.leaderboard).toHaveLength(1);
+    // US-20: `answerTimesMs`/`totalTimeMs` sobreviven el viaje legacy ↔ dominio.
+    expect(playerFromLegacy.answerTimesMs).toEqual({ "q-1": 1500 });
+    expect(domainResults.leaderboard[0].totalTimeMs).toBe(1500);
   });
 });

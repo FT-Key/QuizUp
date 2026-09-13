@@ -23,9 +23,15 @@ function cloneQuestion(question: Question): Question {
 }
 
 function clonePlayer(player: Player): Player {
+  // US-20: `answerTimesMs` se clona sin aliasing y la AUSENCIA legacy se preserva
+  // (no se materializa `{}` al clonar, a diferencia de `toPersistencePlayer`).
+  const { answerTimesMs, ...rest } = player;
   return {
-    ...player,
+    ...rest,
     answers: { ...player.answers },
+    ...(answerTimesMs !== undefined
+      ? { answerTimesMs: { ...answerTimesMs } }
+      : {}),
     joinedAt: new Date(player.joinedAt.getTime()),
     avatar: player.avatar
       ? {

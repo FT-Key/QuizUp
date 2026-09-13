@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trophy, Users, CheckCircle } from "lucide-react";
+import { Trophy, Users, CheckCircle, Zap } from "lucide-react";
 import Link from "next/link";
 import { Podium } from "./Podium";
 import { Avatar } from "./Avatar";
 import { calculateAccuracyFromResults } from "@/core/domain/results/accuracy";
+import { formatDurationSeconds, isFasterAnswersWinner } from "@/lib/results-display";
 import type { GameResults } from "@/types";
 
 interface ResultsProps {
@@ -138,6 +139,12 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
             <div className="space-y-2 sm:space-y-3">
               {results.leaderboard.map((player, index) => {
                 const allCorrect = player.correctAnswers === results.totalQuestions;
+                const tieBreakTimeMs = isFasterAnswersWinner(
+                  results.leaderboard,
+                  index
+                )
+                  ? player.totalTimeMs
+                  : undefined;
                 return (
                   <div
                     key={player.playerId}
@@ -172,7 +179,7 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
 
                       <div className="min-w-0">
                         <span className="font-bold text-gray-800 truncate block">{player.name}</span>
-                        <div className="flex items-center gap-1 mt-0.5">
+                        <div className="flex items-center gap-2 mt-0.5">
                           {allCorrect ? (
                             <span className="text-xs font-bold text-[#26890C] flex items-center gap-1">
                               <CheckCircle className="h-3 w-3" /> All Correct
@@ -180,6 +187,12 @@ export function Results({ gameId, results: resultsProp }: ResultsProps) {
                           ) : (
                             <span className="text-xs font-bold text-gray-500">
                               {player.correctAnswers}/{results.totalQuestions} correct
+                            </span>
+                          )}
+                          {tieBreakTimeMs !== undefined && (
+                            <span className="text-xs font-bold text-[#1368CE] flex items-center gap-1">
+                              <Zap className="h-3 w-3" />
+                              Faster answers · {formatDurationSeconds(tieBreakTimeMs)}
                             </span>
                           )}
                         </div>

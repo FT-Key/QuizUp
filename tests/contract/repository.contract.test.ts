@@ -364,6 +364,24 @@ function describeRepositoryContract(
         await options.verifyPersistedUnchanged(code, original);
       }
     });
+
+    it("(9) round-trip de un jugador legacy sin respuestas: answers {} intacto y campos actuales completos", async () => {
+      const code = nextCode();
+      const legacy = playerFixture(`${code}-legacy`, code, {
+        name: "Franco",
+        answers: {},
+        score: 0,
+      });
+      await options.seedGame(repo, gameFixture(code, { players: [legacy] }));
+
+      const found = await repo.findById(code);
+
+      expect(found).not.toBeNull();
+      expect(found!.players).toHaveLength(1);
+      expect(found!.players[0]).toEqual(legacy);
+      expect(Object.keys(found!.players[0].answers)).toEqual([]);
+      expect(found!.players[0].gameId).toBe(code);
+    });
   });
 }
 

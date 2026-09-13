@@ -103,15 +103,18 @@ describe("calculateResults — cálculo único de resultados (paridad ruta legac
       )
       .build();
 
-    const [ana, beto] = calculateResults(game).leaderboard;
+    const [first, second] = calculateResults(game).leaderboard;
 
-    expect(ana.percentage).toBe(33.33333333333333);
-    expect(ana.percentage).not.toBe(33);
-    expect(beto.percentage).toBe(66.66666666666666);
-    expect(beto.percentage).not.toBe(67);
+    // US-20: Beto (101) va primero por score desc; el crudo de cada uno no cambia.
+    expect(first.playerId).toBe("p2");
+    expect(first.percentage).toBe(66.66666666666666);
+    expect(first.percentage).not.toBe(67);
+    expect(second.playerId).toBe("p1");
+    expect(second.percentage).toBe(33.33333333333333);
+    expect(second.percentage).not.toBe(33);
   });
 
-  it("leaderboard conserva el orden de players (no ordena por score)", () => {
+  it("ordena por score desc (US-20): Ana 900 primero aunque Zoe esté insertada antes", () => {
     const game = new ResultsBuilder()
       .withQuestions(questionFixture("q1", 0))
       .withPlayers(
@@ -123,10 +126,63 @@ describe("calculateResults — cálculo único de resultados (paridad ruta legac
     const leaderboard = calculateResults(game).leaderboard;
 
     expect(leaderboard.map((entry) => entry.playerId)).toEqual([
-      "p-zoe",
       "p-ana",
+      "p-zoe",
     ]);
-    expect(leaderboard.map((entry) => entry.score)).toEqual([100, 900]);
+    expect(leaderboard.map((entry) => entry.score)).toEqual([900, 100]);
+  });
+
+  it("empate en score: desempata por totalTimeMs asc y emite la clave (US-20)", () => {
+    const game = new ResultsBuilder()
+      .withQuestions(questionFixture("q1", 0))
+      .withPlayers(
+        {
+          id: "p-slow",
+          name: "Slow",
+          answers: { q1: 0 },
+          score: 500,
+          answerTimesMs: { q1: 8000 },
+        },
+        {
+          id: "p-fast",
+          name: "Fast",
+          answers: { q1: 0 },
+          score: 500,
+          answerTimesMs: { q1: 2000 },
+        }
+      )
+      .build();
+
+    const leaderboard = calculateResults(game).leaderboard;
+
+    expect(leaderboard.map((entry) => entry.playerId)).toEqual([
+      "p-fast",
+      "p-slow",
+    ]);
+    expect(leaderboard.map((entry) => entry.totalTimeMs)).toEqual([2000, 8000]);
+  });
+
+  it("legacy sin answerTimesMs: omite la clave y cae a joinedAt asc (US-20)", () => {
+    const base = 1_700_000_000_000;
+    const game = new ResultsBuilder()
+      .withPlayers(
+        {
+          id: "p-late",
+          name: "Late",
+          score: 500,
+          joinedAt: new Date(base + 1000),
+        },
+        { id: "p-early", name: "Early", score: 500, joinedAt: new Date(base) }
+      )
+      .build();
+
+    const leaderboard = calculateResults(game).leaderboard;
+
+    expect(leaderboard.map((entry) => entry.playerId)).toEqual([
+      "p-early",
+      "p-late",
+    ]);
+    expect(leaderboard.every((entry) => !("totalTimeMs" in entry))).toBe(true);
   });
 
   it("avatar: la clave existe siempre; se propaga cuando está presente", () => {
@@ -160,6 +216,16 @@ describe("calculateResults — cálculo único de resultados (paridad ruta legac
     for (const question of results.questionResults ?? []) {
       expect(question.playerAnswers).toEqual([]);
     }
+  });
+
+  it("emite SIEMPRE questionResults y averageScore (claves presentes aunque no haya datos)", () => {
+    const results = calculateResults(new ResultsBuilder().build());
+
+    expect("questionResults" in results).toBe(true);
+    expect("averageScore" in results).toBe(true);
+    expect(results.questionResults).toEqual([]);
+    expect(results.averageScore).toBe(0);
+    expect(results.leaderboard).toEqual([]);
   });
 
   it("sin preguntas ⇒ totalQuestions 0, percentage 0 sin dividir por cero, questionResults []", () => {

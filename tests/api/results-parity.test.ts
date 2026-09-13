@@ -179,10 +179,14 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
     const raw = calculateResults(game);
 
     // El dominio entrega el porcentaje crudo; el DTO lo redondea al presentar.
-    expect(raw.leaderboard[0].percentage).not.toBe(33);
-    expect(raw.leaderboard[0].percentage).toBeCloseTo(33.33333333333333);
-    expect(response.body.results.leaderboard[0].percentage).toBe(33);
-    expect(response.body.results.leaderboard[1].percentage).toBe(67);
+    // US-20: Beto (101) lidera por score desc; el crudo de cada uno no cambia.
+    expect(raw.leaderboard[0].playerId).toBe("p2");
+    expect(raw.leaderboard[0].percentage).not.toBe(67);
+    expect(raw.leaderboard[0].percentage).toBeCloseTo(66.66666666666666);
+    expect(raw.leaderboard[1].percentage).not.toBe(33);
+    expect(raw.leaderboard[1].percentage).toBeCloseTo(33.33333333333333);
+    expect(response.body.results.leaderboard[0].percentage).toBe(67);
+    expect(response.body.results.leaderboard[1].percentage).toBe(33);
     expect(response.body.results.averageScore).toBe(100.5);
     expect(toResultsDto(raw)).toEqual(response.body.results);
   });
@@ -275,7 +279,7 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
     expect(toResultsDto(domainResults)).toEqual(response.body.results);
   });
 
-  it("el leaderboard conserva el orden del documento: no ordena por score", async () => {
+  it("el leaderboard ordena por score desc (US-20)", async () => {
     const game = new ResultsBuilder()
       .withId("123456")
       .withCreatedAt(CREATED_AT)
@@ -289,8 +293,8 @@ describe("paridad route GET /api/games/[gameId]/results ⇄ calculateResults (US
     const response = await callResults(toMongoDoc(game));
 
     expect(response.body.results.leaderboard.map((p) => p.playerId)).toEqual([
-      "p-zoe",
       "p-ana",
+      "p-zoe",
     ]);
     expect(toResultsDto(calculateResults(game))).toEqual(response.body.results);
   });

@@ -335,6 +335,7 @@ describe("GET /api/games/[gameId]/results — cálculo de resultados (caracteriz
 
     // El dominio devuelve el porcentaje crudo y la capa REST/mapper redondea,
     // como hoy (`toResultsDto`); `averageScore` NO se redondea.
+    // US-20: Beto (101) lidera por score desc (antes el orden era de inserción).
     expect(response.body).toEqual({
       results: {
         gameId: "123456",
@@ -343,21 +344,21 @@ describe("GET /api/games/[gameId]/results — cálculo de resultados (caracteriz
         totalQuestions: 3,
         leaderboard: [
           {
-            playerId: "p1",
-            name: "Ana",
-            score: 100,
-            correctAnswers: 1,
-            totalQuestions: 3,
-            percentage: 33,
-            avatar: undefined,
-          },
-          {
             playerId: "p2",
             name: "Beto",
             score: 101,
             correctAnswers: 2,
             totalQuestions: 3,
             percentage: 67,
+            avatar: undefined,
+          },
+          {
+            playerId: "p1",
+            name: "Ana",
+            score: 100,
+            correctAnswers: 1,
+            totalQuestions: 3,
+            percentage: 33,
             avatar: undefined,
           },
         ],
@@ -645,7 +646,7 @@ describe("GET /api/games/[gameId]/results — cálculo de resultados (caracteriz
     expect(betoEntry.avatar).toBeUndefined();
   });
 
-  it("el leaderboard conserva el orden del documento: no ordena por score", async () => {
+  it("el leaderboard ordena por score desc (US-20): Ana 900 primero aunque Zoe esté antes en el documento", async () => {
     const q1 = mongoQuestion("q1", "Pregunta 1", 0);
 
     const response = await callResults(
@@ -667,18 +668,18 @@ describe("GET /api/games/[gameId]/results — cálculo de resultados (caracteriz
         totalQuestions: 1,
         leaderboard: [
           {
-            playerId: "p-zoe",
-            name: "Zoe",
-            score: 100,
+            playerId: "p-ana",
+            name: "Ana",
+            score: 900,
             correctAnswers: 1,
             totalQuestions: 1,
             percentage: 100,
             avatar: undefined,
           },
           {
-            playerId: "p-ana",
-            name: "Ana",
-            score: 900,
+            playerId: "p-zoe",
+            name: "Zoe",
+            score: 100,
             correctAnswers: 1,
             totalQuestions: 1,
             percentage: 100,
