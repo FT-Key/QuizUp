@@ -328,6 +328,49 @@ describe("toDomain", () => {
 
     expect(toDomain(doc).players[0].answers).toEqual({ q1: 2 });
   });
+
+  it("normaliza answers de objeto plano (doc lean) igual que un Map y sin aliasing", () => {
+    const base: GameDoc = {
+      gameCode: "123456",
+      name: "Lean",
+      createdAt: CREATED_AT,
+      creatorId: "creator-1",
+      status: "waiting",
+      currentQuestionIndex: 0,
+    };
+    const asMap: GameDoc = {
+      ...base,
+      players: [
+        {
+          id: "p1",
+          name: "Ana",
+          joinedAt: JOINED_AT,
+          answers: new Map<string, number>([["q1", 2]]),
+          score: 500,
+        },
+      ],
+    };
+    const plainAnswers = { q1: 2 };
+    const asLean: GameDoc = {
+      ...base,
+      players: [
+        {
+          id: "p1",
+          name: "Ana",
+          joinedAt: JOINED_AT,
+          answers: plainAnswers,
+          score: 500,
+        },
+      ],
+    };
+
+    const fromMap = toDomain(asMap).players[0];
+    const fromLean = toDomain(asLean).players[0];
+
+    expect(fromLean).toEqual(fromMap);
+    expect(fromLean.answers).toEqual({ q1: 2 });
+    expect(fromLean.answers).not.toBe(plainAnswers);
+  });
 });
 
 describe("toPersistence", () => {

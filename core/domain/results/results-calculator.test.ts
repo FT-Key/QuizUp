@@ -162,6 +162,16 @@ describe("calculateResults — cálculo único de resultados (paridad ruta legac
     }
   });
 
+  it("emite SIEMPRE questionResults y averageScore (claves presentes aunque no haya datos)", () => {
+    const results = calculateResults(new ResultsBuilder().build());
+
+    expect("questionResults" in results).toBe(true);
+    expect("averageScore" in results).toBe(true);
+    expect(results.questionResults).toEqual([]);
+    expect(results.averageScore).toBe(0);
+    expect(results.leaderboard).toEqual([]);
+  });
+
   it("sin preguntas ⇒ totalQuestions 0, percentage 0 sin dividir por cero, questionResults []", () => {
     const game = new ResultsBuilder()
       .withPlayers(
