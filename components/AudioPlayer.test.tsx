@@ -400,6 +400,28 @@ describe("AudioPlayer — panel de volumen (US-23 H1)", () => {
     expect(button.getAttribute("aria-expanded")).toBe("false");
   });
 
+  it("un tap real (pointerdown touch + click) abre el panel y, además, alterna el mute (comportamiento actual)", () => {
+    render(<loaded.AudioPlayer />);
+    const button = screen.getByRole("button");
+    const player = loaded.getMusicPlayer();
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(player.isMuted()).toBe(true);
+
+    // Un tap táctil real despacha primero `pointerdown` y luego `click`.
+    // Comportamiento actual y aceptado por el review de US-23: el `pointerdown`
+    // alterna el panel (false -> true) y el `click` posterior alterna el mute
+    // (true -> false), de modo que un solo tap hace ambas cosas. No se desacopla
+    // el mute del tap para no cambiar la interacción existente; si se decidiera
+    // que un tap solo abre/cierra el panel, habría que frenar el click táctil y
+    // este test pasaría a esperar aria-expanded=true y muted sin cambios.
+    fireEvent.pointerDown(button, { pointerType: "touch" });
+    fireEvent.click(button);
+
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(player.isMuted()).toBe(false);
+    expect(localStorage.getItem("quizup-muted")).toBe("false");
+  });
+
   it("el slider sigue usable con el panel abierto por hover (AC1)", () => {
     render(<loaded.AudioPlayer />);
     const slider = screen.getByRole("slider") as HTMLInputElement;

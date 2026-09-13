@@ -21,6 +21,13 @@ import {
 
 const FADE = MUSIC_FADE_MS;
 
+/**
+ * Ancla literal de AC3 (US-23): cada rampa dura 1,5 s. Vive solo aquí para que
+ * bajar `MUSIC_FADE_MS` (o dejar de respetarla) rompa el test, sin repetir el
+ * número mágico por el resto de los casos.
+ */
+const AC3_FADE_MS = 1500;
+
 function asElement(element: FakeAudioElement): HTMLAudioElement {
   return element as unknown as HTMLAudioElement;
 }
@@ -200,6 +207,38 @@ describe("createMusicPlayer — avance de playlist", () => {
 });
 
 describe("createMusicPlayer — duración de rampa (US-23 AC3)", () => {
+  it("la duración de rampa está anclada en 1500 ms por rampa", () => {
+    expect(MUSIC_FADE_MS).toBe(AC3_FADE_MS);
+  });
+
+  it("con 1500 ms exactos el fade-out llega a 0 y el fade-in al target", async () => {
+    const timers = fakeTimers();
+    const { element, mixer, player } = setup();
+    await startWithGesture(player, element);
+
+    player.setContext("game");
+
+    // Fade-out: un tick antes de 1500 ms la pista vieja sigue sonando y la rampa
+    // aún no llegó a 0.
+    await timers.advanceAsync(AC3_FADE_MS - MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBeGreaterThan(0);
+    expect(element.src).toContain("/music/QueueUp.mp3");
+
+    // Exactamente a los 1500 ms la saliente llega a 0 y se cambia de pista.
+    await timers.advanceAsync(MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBe(0);
+    expect(element.src).toContain("/music/QuizUp.mp3");
+
+    // Fade-in: un tick antes de otros 1500 ms sigue por debajo del target.
+    await timers.advanceAsync(AC3_FADE_MS - MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBeGreaterThan(0);
+    expect(mixer.lastTrackGain).toBeLessThan(MUSIC_DEFAULT_VOLUME);
+
+    // Exactamente a los 1500 ms del fade-in alcanza el target.
+    await timers.advanceAsync(MUSIC_FADE_STEP_MS);
+    expect(mixer.lastTrackGain).toBeCloseTo(MUSIC_DEFAULT_VOLUME, 5);
+  });
+
   it("el fade-out de contexto baja a 0 a los ~1500 ms, con valores intermedios", async () => {
     const timers = fakeTimers();
     const { element, mixer, player } = setup();

@@ -12,7 +12,7 @@ export const MUSIC_PLAYLISTS = {
 /** Duración de CADA rampa del fade (out y, luego, in), en ms. US-23: 1,5 s. */
 export const MUSIC_FADE_MS = 1500;
 
-/** Paso del fade; nº de ticks por rampa = MUSIC_FADE_MS / MUSIC_FADE_STEP_MS = 30. */
+/** Paso del fade; nº de ticks por rampa = MUSIC_FADE_MS / MUSIC_FADE_STEP_MS. */
 export const MUSIC_FADE_STEP_MS = 50;
 
 /** Volumen objetivo por defecto (0..1) = 40 %. */
