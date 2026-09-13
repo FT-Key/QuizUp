@@ -9,8 +9,8 @@ export const MUSIC_PLAYLISTS = {
   game: ["/music/QuizUp.mp3", "/music/QuizUp2.mp3"],
 } as const satisfies Record<MusicContext, readonly string[]>;
 
-/** Duración de CADA rampa del fade (out y, luego, in), en ms. */
-export const MUSIC_FADE_MS = 600;
+/** Duración de CADA rampa del fade (out y, luego, in), en ms. US-23: 1,5 s. */
+export const MUSIC_FADE_MS = 1500;
 
 /** Paso del fade; nº de ticks por rampa = MUSIC_FADE_MS / MUSIC_FADE_STEP_MS. */
 export const MUSIC_FADE_STEP_MS = 50;

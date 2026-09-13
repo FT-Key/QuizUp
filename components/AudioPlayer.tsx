@@ -7,6 +7,14 @@
  * vertical, además del estado puramente visual `expanded`. Toda la lógica de
  * audio (contexto/playlists, crossfade, autoplay, volumen/mute y persistencia)
  * vive en `useMusicPlayer`.
+ *
+ * US-23, H1 — apertura del panel:
+ * - Con puntero (`mouse`) el panel se abre al entrar al control completo
+ *   (`[data-volume-control]`: botón + panel) y se cierra al salir, para que el
+ *   slider siga usable mientras el puntero está dentro. El click sigue
+ *   alternando mute.
+ * - En táctil/pluma el hover no existe: el tap (`pointerdown`) alterna el panel;
+ *   el `click` del botón sigue alternando mute.
  */
 import { useEffect, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
@@ -39,15 +47,21 @@ export function AudioPlayer() {
     <div
       data-volume-control
       className="fixed bottom-5 right-5 z-50 flex flex-col-reverse items-center gap-2"
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
     >
       <button
         onClick={toggleMute}
         onPointerDown={(e) => {
           e.stopPropagation();
-          setExpanded((prev) => !prev);
+          // Con mouse el panel lo gobierna el hover; en táctil/pluma, el tap.
+          if (e.pointerType !== "mouse") {
+            setExpanded((prev) => !prev);
+          }
         }}
         className="bg-white/20 backdrop-blur-md text-white p-3 rounded-full shadow-lg hover:bg-white/30 active:bg-white/40 transition-all border border-white/20"
         aria-label={muted ? "Unmute" : "Mute"}
+        aria-expanded={expanded}
       >
         {muted ? (
           <VolumeX className="h-5 w-5" />
